@@ -1,27 +1,31 @@
 # Initial Release - 1.0
 
-This repository is a hard fork of my existing plugin hoekens-anchor-alarm.  We will be reworking this plugin into a new one called caveman-chartplotter.  The new plugin will be focused primarily on being a simple, lightweight chart plotter that can run on Navico MFDs that run an older version of Chromium (69).
+- other vessel heading: dont use wind direction anymore, only use ais data: COG
 
-## Done
+- home icon / follow mode
+  - the chart should have 2 modes:
+    - free drag
+      - in free drag mode, we can move the map anywhere we want and it will stay fixed
+      - any pan move will transition us to pan mode.
+    - follow mode
+      - clicking the Home icon will center and zoom us to our boat.
+      - the viewport should continue to stay centered on our boat as new positions come in.
+      - we should highlight the home icon somehow to show we are in follow mode
+    - zooming does not change modes.
+  - optional "Look ahead" mode for follow mode
+    - configurable option in the UI/backend dialog box.
+    - default true
+    - biases the view towards the map ahead of us based on our speed and direction.
 
-- [x] all anchor related functionality removed from both the front end and the backend:
-  - [x] watch zones (shared/watch-zones/, ui zone controls + overlays)
-  - [x] glitch filter (backend, AppState, FleetLayer, config option)
-  - [x] scopes (shared/scopes.js, scope panel, scope config)
-  - [x] api calls for anchoring (dropAnchor / setZone / raiseAnchor routes + SignalKHelper methods)
-  - [x] watchdog timer
-  - [x] engine state checks (src/utils.js)
-  - [x] anchor control overlays (AnchorOverlay, AnchorController, toolbar drop/raise/shape controls)
-  - [x] scope panel, wind panel + wind barbs, tide panel, info panel
-- [x] UI config options removed: Show Tide/Wind/Scope Panel, Scope Ratios, Default Watch Zone Shape, Glitch Filter Max Speed
-- [x] kept: config button + modal, layer selector (custom charts + seascape), theme selector, home button (recenters on boat), zoom controls, status bar with set/clear errors, login/logout, fleet layer + historical tracks, SignalKHelper/SignalKStream, custom boat icon
-- [x] renamed plugin identity: package `caveman-chartplotter` v1.0.0, plugin id/name, webapp title/manifest, `AnchorAlarm.js` → `ChartPlotter.js`
-- [x] fresh CHANGELOG, rewritten README, updated RELEASE/DEVELOPMENT docs
-- [x] tests updated (66 passing), lint clean, vite build clean
+- add boat vectors
+  - each boat should have a vector based on its COG, SOG, and configurable time.
+  - vector should start from the bow of the boat and extend outwards in direction of travel.
+  - length of vector based on SOG and a configurable time period.
+  - time period should be configurable in the UI panel and backend.  use the following options:
+    - 5 minutes
+    - 10 minutes
+    - 15 minutes (default)
+    - 30 minutes
+    - 60 minutes
 
-## Remaining before release
-
-- [ ] new logo artwork — `branding/logo.png` and the generated favicons/app icons still show the anchor-alarm anchor; replace the master and run `npm run generate:icons`
-- [ ] new appstore screenshots (`signalk.screenshots` in package.json is currently empty)
-- [ ] test on a real Navico MFD (Chromium 69) before tagging v1.0.0
-- [ ] create the GitHub repo / set up npm trusted publishing (see RELEASE.md)
+- new appstore screenshots (`signalk.screenshots` in package.json is currently empty)
