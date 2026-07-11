@@ -70,7 +70,3 @@ This app pairs well with some other software:
 ## Contributing
 
 Issues and PRs are welcome; this is an open source project and I'm happy to have company. See [DEVELOPMENT.md](DEVELOPMENT.md) for getting set up, and [CHANGELOG.md](CHANGELOG.md) for the full history of what's changed.
-
-## Attribution
-
-[Anchor icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/anchor)
