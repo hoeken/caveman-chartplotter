@@ -10,6 +10,7 @@ This project is a hard fork of [hoekens-anchor-alarm](https://github.com/hoeken/
 - **Physically accurate boat icons** — drawn to true size from your beam/LOA/antenna offsets, typed by AIS ship type, with custom icon upload
 - **Fleet & tracks** — live AIS neighbors with name labels and info popups, plus color-coded historical tracks via @signalk/tracks-plugin
 - **Course vectors** — a COG/SOG predictor line from each vessel's bow showing where it will be after a configurable time (5–60 min, or off)
+- **Follow mode** — the home button locks the viewport to your boat and stays highlighted green while tracking; any drag returns to free-pan. An optional "look ahead" biases the view toward the water ahead based on your speed and course
 - **Day/night themes** — one-tap toggle plus native handling of the Navico `?mode=night`/`?mode=day` parameter
 - **In-map settings** — login/logout and live-applying configuration from a gear button on the map
 - **Embedding** — `?embedded=true` strips the chrome for use inside dashboards and MFD pages

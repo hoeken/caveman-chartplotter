@@ -16,6 +16,7 @@ const FIELDS = [
   { key: "enableOwnTrack", label: "Show My Boat Track", type: "checkbox" },
   { key: "enableOtherTracks", label: "Show Other Boat Tracks", type: "checkbox" },
   { key: "enableChartLayers", label: "Use Chart Layers if Available", type: "checkbox" },
+  { key: "enableLookAhead", label: "Look Ahead in Follow Mode", type: "checkbox" },
   // The Seascape depth overlay needs MapLibre/WebGL (see SeascapeLoader), so the
   // toggle is only offered where it can render; on the Chromium 69 MFDs it's
   // hidden rather than left as a dead switch.

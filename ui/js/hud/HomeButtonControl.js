@@ -18,8 +18,10 @@ export const HomeButtonControl = L.Control.extend({
   <path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L2 8.207V13.5A1.5 1.5 0 0 0 3.5 15h9a1.5 1.5 0 0 0 1.5-1.5V8.207l.646.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293zM13 7.207V13.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V7.207l5-5z"/>
 </svg>`;
     homeButton.href = "#";
-    setTitle(homeButton, "Center on Boat");
     homeButton.setAttribute("role", "button");
+    this._button = homeButton;
+    // Reflect any active state requested before the control was added.
+    this.setActive(this._active);
 
     L.DomEvent.disableClickPropagation(container);
     const onHome = this.options.onHome;
@@ -31,5 +33,23 @@ export const HomeButtonControl = L.Control.extend({
     });
 
     return container;
+  },
+
+  // Highlight the button while follow mode is on (see ChartPlotter). A green
+  // ring/glyph (leaflet-control-home-active in style.css) shows the view is
+  // locked to the boat. Safe to call before onAdd — the state is stored and
+  // applied when the DOM exists.
+  setActive: function (active) {
+    this._active = Boolean(active);
+    if (!this._button)
+      return;
+    L.DomUtil[this._active ? "addClass" : "removeClass"](
+      this._button,
+      "leaflet-control-home-active",
+    );
+    setTitle(
+      this._button,
+      this._active ? "Following Boat" : "Center on Boat",
+    );
   },
 });

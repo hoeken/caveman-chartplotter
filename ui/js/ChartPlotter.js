@@ -15,6 +15,7 @@ import { ControlToolbar } from "./hud/ControlToolbar.js";
 import { ConfigPanel } from "./hud/ConfigPanel.js";
 import { ThemeControl } from "./hud/ThemeControl.js";
 import { Modal } from "./hud/Modal.js";
+import { lookAheadOffsetPixels } from "./LookAhead.js";
 import { nativeTooltipsSuppressed, isNavicoMfd } from "./BrowserSupport.js";
 
 const UPDATE_INTERVAL_MS = 500;
@@ -79,6 +80,7 @@ class ChartPlotter {
       enableChartLayers: true,
       enableSeascape: false,
       courseVectorMinutes: 15,
+      enableLookAhead: true,
       hasCustomIcon: false,
     };
     this.state.loggedIn = false;
@@ -88,6 +90,13 @@ class ChartPlotter {
     // clean, read-only map.
     const params = new URLSearchParams(window.location.search);
     this.embedded = boolParam(params, "embedded", false);
+
+    // Follow vs. free-drag mode. In follow mode the viewport tracks the boat as
+    // new positions arrive and the home button is highlighted; any user drag
+    // drops back to free drag. Toggled via enterFollowMode/exitFollowMode; the
+    // per-tick recenter runs from updateMap. Starts on so the boat is framed and
+    // tracked on load.
+    this.following = false;
 
     this.map = undefined;
     this.fleetLayer = undefined;
@@ -265,10 +274,70 @@ class ChartPlotter {
     handler.enable();
   }
 
-  // Center the map on our own boat. Used for the initial view and by the home
-  // button.
-  centerOnBoat() {
-    this.map.setView(this.state.getPosition(), HOME_ZOOM);
+  // Enter follow mode: frame the boat at HOME_ZOOM and keep the viewport locked
+  // to it as new positions arrive (see followTick). Used by the home button and
+  // on initial load. Clicking home while already following just re-frames at
+  // HOME_ZOOM. The home button is highlighted (green) to show follow is active.
+  enterFollowMode() {
+    this.following = true;
+    this.homeButton?.setActive(true);
+    this.recenterOnBoat(HOME_ZOOM, true);
+  }
+
+  // Leave follow mode for free drag: the map stays wherever the user puts it.
+  // Triggered by a user pan (dragstart) and clears the home-button highlight.
+  exitFollowMode() {
+    if (!this.following)
+      return;
+    this.following = false;
+    this.homeButton?.setActive(false);
+  }
+
+  // Per-tick recenter while following, at the current zoom so a user's manual
+  // zoom is preserved (zooming doesn't change modes). Called from updateMap.
+  followTick() {
+    if (!this.following || !this.map)
+      return;
+    this.recenterOnBoat(this.map.getZoom(), false);
+  }
+
+  // Center the map on the follow target (the boat, or a point biased ahead of it
+  // — see followCenter) at the given zoom. Skips the setView when we're already
+  // there so a moored boat doesn't fire a redundant moveend every tick.
+  recenterOnBoat(zoom, animate) {
+    const target = this.followCenter(zoom);
+    if (!animate && this.map.getZoom() === zoom) {
+      const current = this.map.project(this.map.getCenter(), zoom);
+      const goal = this.map.project(target, zoom);
+      if (current.distanceTo(goal) < 0.5)
+        return;
+    }
+    this.map.setView(target, zoom, { animate });
+  }
+
+  // The map center to follow. Normally the boat itself; with the "look ahead"
+  // option on, the center is nudged along our course (scaled by speed) so more
+  // of the water ahead is visible while the boat stays comfortably on screen.
+  // The pixel offset is pure/testable (see LookAhead.js); here we project the
+  // boat to pixels at the target zoom, shift, and unproject back to a lat/lng.
+  followCenter(zoom) {
+    const boat = this.state.getPosition();
+    if (!this.config.enableLookAhead)
+      return boat;
+
+    const size = this.map.getSize();
+    const offset = lookAheadOffsetPixels({
+      // Bias along our course over ground, falling back to heading; both are in
+      // radians true (Signal K base units).
+      cogRad: this.state.cog?.value ?? this.state.heading?.value ?? null,
+      sogMps: this.state.sog?.value ?? null,
+      viewportMin: Math.min(size.x, size.y),
+    });
+    if (offset.x === 0 && offset.y === 0)
+      return boat;
+
+    const boatPoint = this.map.project(boat, zoom);
+    return this.map.unproject(boatPoint.add(L.point(offset.x, offset.y)), zoom);
   }
 
   // === Initial load (one /self call, broken into phases) ===========================
@@ -296,7 +365,7 @@ class ChartPlotter {
         this.buildMap();
 
         this.updateMap();
-        this.centerOnBoat();
+        this.enterFollowMode();
       })
       .catch((error) => {
         const detail = error.statusText || error.message || "unknown error";
@@ -514,7 +583,7 @@ class ChartPlotter {
     // Buttons - Top Right
     //
     this.homeButton = new HomeButtonControl({
-      onHome: () => this.centerOnBoat(),
+      onHome: () => this.enterFollowMode(),
     });
     this.map.addControl(this.homeButton);
 
@@ -532,6 +601,14 @@ class ChartPlotter {
     // Panning or zooming re-derives which local charts belong in the layer
     // control for the new view (moveend also fires after a zoom completes).
     this.map.on("moveend", () => this.updateChartLayers());
+    // A user drag is the "free drag" gesture: it drops us out of follow mode so
+    // the map stays put. dragstart fires only on real user pans, never on our
+    // own setView recenters or on zooming — so zooming keeps follow mode on.
+    this.map.on("dragstart", () => this.exitFollowMode());
+    // Zooming doesn't change modes, but a cursor-anchored zoom moves the boat
+    // off-center; snap it back right away when following instead of waiting for
+    // the next update tick.
+    this.map.on("zoomend", () => this.followTick());
     window.addEventListener("resize", () => this.updateAttribution());
 
     this.fleetLayer = new FleetLayer({
@@ -698,6 +775,8 @@ class ChartPlotter {
     this.toolbar.update(this.state);
     this.statusBar.update(this.state);
     this.fleetLayer.update(this.state);
+    // Keep the viewport locked to the boat while following (no-op otherwise).
+    this.followTick();
   }
 
   // === Live updates ===============================================================

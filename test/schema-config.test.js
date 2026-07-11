@@ -94,6 +94,7 @@ describe("applyDefaults()", () => {
     assert.equal(config.enableChartLayers, true);
     assert.equal(config.enableSeascape, false);
     assert.equal(config.courseVectorMinutes, 15);
+    assert.equal(config.enableLookAhead, true);
   });
 
   test("never overwrites a value the user already set", () => {

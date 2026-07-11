@@ -267,6 +267,21 @@ body,
   stroke-width: 0.5;
 }
 
+/* Home button while follow mode is on (see ChartPlotter): a green ring + green
+   glyph make it obvious the view is locked to the boat. An inset box-shadow is
+   used instead of a real border so the fixed-size Leaflet control doesn't shift.
+   The dark-mode variant needs extra specificity to beat the themed base rule
+   above and uses a brighter green to read on the dark control background. */
+.leaflet-control-home.leaflet-control-home-active {
+  color: #1a9d3f;
+  box-shadow: inset 0 0 0 2px #1a9d3f;
+}
+
+html.dark .leaflet-control-home.leaflet-control-home-active {
+  color: #37c65a;
+  box-shadow: inset 0 0 0 2px #37c65a;
+}
+
 /* Reusable modal dialog (see ui/js/hud/Modal.js). Fixed full-viewport backdrop
    dims the page and flex-centers the dialog. We deliberately avoid flexbox
    `gap` (unsupported before Chromium 84, the Navico MFD engine) and use the

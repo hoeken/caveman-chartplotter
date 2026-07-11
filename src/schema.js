@@ -127,6 +127,13 @@ export function buildSchema(app) {
         ],
         default: 15,
       },
+      enableLookAhead: {
+        type: "boolean",
+        title: "Look Ahead in Follow Mode",
+        description:
+          "While following your boat (the home button), bias the view toward the water ahead based on your speed and course, instead of centering exactly on the boat.",
+        default: true,
+      },
     },
   };
 
@@ -158,6 +165,7 @@ export const UI_CONFIG_KEYS = [
   "enableChartLayers",
   "enableSeascape",
   "courseVectorMinutes",
+  "enableLookAhead",
 ];
 
 // Project the UI-relevant subset out of a full plugin config (the /ui-config
