@@ -1,8 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
-  migrateConfig,
-  readZoneConfig,
   pickUiConfig,
   coerceUiConfig,
   applyDefaults,
@@ -14,66 +12,15 @@ import { ValidationError } from "../src/errors.js";
 // stub that reports every path as absent is enough for coercion/defaults tests.
 const APP = { getSelfPath: () => null };
 
-describe("migrateConfig()", () => {
-  test("upgrades a legacy top-level radius into a circle zone string", () => {
-    const config = { radius: 50 };
-    assert.equal(migrateConfig(config), true);
-    assert.equal(config.radius, undefined);
-    assert.deepEqual(JSON.parse(config.zone), { type: "circle", radius: 50 });
-  });
-
-  test("leaves an already-migrated config untouched", () => {
-    const config = { zone: JSON.stringify({ type: "sector", radius: 80 }) };
-    assert.equal(migrateConfig(config), false);
-    assert.deepEqual(JSON.parse(config.zone), { type: "sector", radius: 80 });
-  });
-
-  test("does nothing without a usable legacy radius", () => {
-    for (const radius of [0, -5, NaN, undefined, "nope"]) {
-      const config = { radius };
-      assert.equal(migrateConfig(config), false);
-      assert.equal(config.zone, undefined);
-    }
-  });
-
-  test("is idempotent — a second run reports no change", () => {
-    const config = { radius: 50 };
-    migrateConfig(config);
-    assert.equal(migrateConfig(config), false);
-  });
-});
-
-describe("readZoneConfig()", () => {
-  test("parses a valid zone JSON string", () => {
-    const config = { zone: JSON.stringify({ type: "circle", radius: 60 }) };
-    assert.deepEqual(readZoneConfig(config), { type: "circle", radius: 60 });
-  });
-
-  test("returns null for missing or empty zone", () => {
-    assert.equal(readZoneConfig({}), null);
-    assert.equal(readZoneConfig({ zone: "" }), null);
-  });
-
-  test("returns null for a non-string zone", () => {
-    assert.equal(readZoneConfig({ zone: { type: "circle" } }), null);
-  });
-
-  test("returns null (not throws) on malformed JSON", () => {
-    assert.equal(readZoneConfig({ zone: "{not json" }), null);
-  });
-});
-
 describe("pickUiConfig()", () => {
   test("projects exactly the whitelisted keys", () => {
     const picked = pickUiConfig({
       defaultBasemap: "Satellite",
-      zone: "secret",
-      state: "emergency",
+      somethingInternal: "secret",
     });
     assert.deepEqual(Object.keys(picked).sort(), [...UI_CONFIG_KEYS].sort());
     assert.equal(picked.defaultBasemap, "Satellite");
-    assert.equal("zone" in picked, false);
-    assert.equal("state" in picked, false);
+    assert.equal("somethingInternal" in picked, false);
   });
 
   test("fills undefined for keys absent from the source config", () => {
@@ -87,7 +34,7 @@ describe("coerceUiConfig()", () => {
   test("returns only the whitelisted keys that were present", () => {
     const updates = coerceUiConfig(APP, {
       defaultBasemap: "OpenStreetMap",
-      state: "alarm", // not a UI key — must be ignored
+      somethingInternal: "nope", // not a UI key — must be ignored
     });
     assert.deepEqual(updates, { defaultBasemap: "OpenStreetMap" });
   });
@@ -95,10 +42,10 @@ describe("coerceUiConfig()", () => {
   test("coerces integers (rounding) and booleans", () => {
     const updates = coerceUiConfig(APP, {
       fleetFilterRadius: "512.7",
-      enableTidePanel: 0,
+      enableBoatLabels: 0,
     });
     assert.equal(updates.fleetFilterRadius, 513);
-    assert.equal(updates.enableTidePanel, false);
+    assert.equal(updates.enableBoatLabels, false);
   });
 
   test("throws ValidationError on an enum violation", () => {
@@ -121,12 +68,12 @@ describe("applyDefaults()", () => {
     const config = {};
     applyDefaults(APP, config);
     assert.equal(config.defaultBasemap, "Satellite");
-    assert.equal(config.enableTidePanel, true);
+    assert.equal(config.fleetFilterRadius, 100000);
     assert.equal(config.enableBoatLabels, true);
+    assert.equal(config.enableOwnTrack, true);
+    assert.equal(config.enableOtherTracks, true);
     assert.equal(config.enableChartLayers, true);
-    assert.equal(config.anchorAlarmInterval, 60);
-    assert.equal(config.allowZoneOutsideVessel, false);
-    assert.equal(config.scopes, "7,5,4,3");
+    assert.equal(config.enableSeascape, false);
   });
 
   test("never overwrites a value the user already set", () => {

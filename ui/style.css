@@ -40,26 +40,9 @@
   --attribution-bg: rgba(255, 255, 255, 0.7);
   --attribution-fg: #333333;
   --attribution-link: #0078a8;
-  --barb-fill: #000000;
-  /* wind barb in the wind panel */
-  --barb-stroke: #000000;
-  --barb-halo: rgba(255, 255, 255, 0.5);
   --label-fg: #000000;
   /* boat name labels over the map */
   --label-halo: #ffffff;
-  --anchor-label-fill: #000000;
-  /* rode-length text on the anchor line */
-  --anchor-label-halo: rgba(255, 255, 255, 0.6);
-  --zone-handle-bg: #ffffff;
-  --zone-handle-border: #333333;
-  --zone-handle-ghost-bg: rgba(255, 255, 255, 0.55);
-  --zone-handle-armed: #000000;
-  --tide-line: #0066cc;
-  /* tide graph curve/fill */
-  --tide-now: #000000;
-  /* "now" marker + label */
-  --tide-marker: #003366;
-  /* hi/lo dots + labels */
 }
 
 html.dark {
@@ -89,20 +72,8 @@ html.dark {
   --attribution-bg: rgba(20, 24, 28, 0.72);
   --attribution-fg: #c8ccd2;
   --attribution-link: #66b2ff;
-  --barb-fill: #cdd1d6;
-  --barb-stroke: #cdd1d6;
-  --barb-halo: rgba(0, 0, 0, 0.55);
   --label-fg: #cdd1d6;
   --label-halo: #000000;
-  --anchor-label-fill: #cdd1d6;
-  --anchor-label-halo: rgba(0, 0, 0, 0.6);
-  --zone-handle-bg: #2c323b;
-  --zone-handle-border: #d0d3d8;
-  --zone-handle-ghost-bg: rgba(44, 50, 59, 0.6);
-  --zone-handle-armed: #ffffff;
-  --tide-line: #66b2ff;
-  --tide-now: #cdd1d6;
-  --tide-marker: #8ab6f2;
 }
 
 /* Dark-mode overrides for Leaflet's own chrome (zoom/layers/popups). These
@@ -133,20 +104,14 @@ html.dark .leaflet-bar a.leaflet-disabled {
   color: var(--surface-fainter);
 }
 
-/* Leaflet's control bars and panels (zoom/home/config/theme, layers,
-   info/scope/status) and our own toolbar buttons ship a hard black drop
-   shadow, which just reads as a dark smudge against the night map. In dark
-   mode swap it for a soft accent-blue glow so the chrome still lifts off the
-   map. Light mode is untouched. */
+/* Leaflet's control bars and panels (zoom/home/config/theme, layers, status)
+   and our own toolbar buttons ship a hard black drop shadow, which just reads
+   as a dark smudge against the night map. In dark mode swap it for a soft
+   accent-blue glow so the chrome still lifts off the map. Light mode is
+   untouched. */
 html.dark .leaflet-bar,
 html.dark .leaflet-control-layers,
-html.dark #loginPrompt button,
-html.dark #anchorDown button,
-html.dark #anchorUp button,
-html.dark #radiusControl,
-html.dark #polygonControl,
-html.dark #zoneShapeButton,
-html.dark #zoneShapeMenu {
+html.dark #loginPrompt button {
   box-shadow: 0 0 4px var(--control-glow);
 }
 
@@ -235,25 +200,12 @@ body,
 
 /* Flexbox `gap` is unsupported before Chromium 84, so on Navico MFDs (Chromium
    69) it collapses to zero spacing. Replace it with margins between items. The
-   same pattern is used for every flex container below.
-
-   This toolbar hides children with `display: none` as state changes (login
-   prompt, raise vs. drop button, shape selector), and both leading and middle
-   children get hidden (e.g. while anchored the raise button shows and the drop
-   button between it and the radius panel is hidden). A `> * + *` margin-left
-   would still match the first *visible* child (the `+` combinator ignores
-   display), leaving a phantom gap before it. margin-right per child avoids that
-   — a hidden element contributes no margin, and it spaces around mid-row gaps
-   correctly too — at the cost of an invisible trailing 6px on the far right
-   (the toolbar has no background or border). */
+   same pattern is used for every flex container below. */
 #controlToolbar > * {
   margin-right: 6px;
 }
 
-/* Shared button chrome. Height and the outer border are set per-control below,
-   since the panels (#radiusControl / #polygonControl) carry the border on their
-   wrapping <div> and their inner buttons are borderless, divided only by
-   lightweight inner rules. */
+/* Shared button chrome. */
 #controlToolbar button {
   pointer-events: auto;
   touch-action: none;
@@ -269,159 +221,19 @@ body,
   background-color: var(--surface-hover);
 }
 
-/* The outer border shared by every top-level toolbar control — matches
-   Leaflet's own control bars, whose border is the fixed
-   `2px solid rgba(0, 0, 0, 0.2)` from leaflet.css rather than the themed
-   --control-border. Using the same literal keeps our chrome homogeneous with
-   the map controls in both themes (the stroke stays fixed instead of flipping
-   light in dark mode). The panels are <div>s, so this can't live on the button
-   rule above. */
-#loginPrompt button,
-#anchorDown button,
-#anchorUp button,
-#radiusControl,
-#polygonControl,
-#zoneShapeButton {
+/* The outer border of the toolbar controls — matches Leaflet's own control
+   bars, whose border is the fixed `2px solid rgba(0, 0, 0, 0.2)` from
+   leaflet.css rather than the themed --control-border. Using the same literal
+   keeps our chrome homogeneous with the map controls in both themes (the
+   stroke stays fixed instead of flipping light in dark mode). */
+#loginPrompt button {
   border: 2px solid rgba(0, 0, 0, 0.2);
   border-radius: 5px;
   background-clip: padding-box;
 }
 
-/* The three raise/drop/radius/shape controls are one 80px-tall row. */
-#anchorDown button,
-#anchorUp button,
-#radiusControl,
-#polygonControl,
-#zoneShapeButton {
-  height: 80px;
-  width: 80px;
-  box-sizing: border-box;
-}
-
-.info {
-  padding: 5px;
-  width: 150px;
-  font-size: 11pt;
-  line-height: 1.1;
-  background-color: var(--surface-bg);
-  color: var(--surface-fg);
-}
-
-.info th,
-.scope th {
-  text-align: left;
-}
-
-.info.leaflet-bar a,
-.leaflet-touch .info.leaflet-bar a {
-  display: inline;
-  width: auto;
-  height: auto;
-  padding: 0;
-  margin: 0;
-  line-height: inherit;
-  background-color: transparent;
-  border: none;
-  border-radius: 0;
-  text-align: left;
-  text-decoration: underline;
-  color: var(--link);
-}
-
-.info.leaflet-bar a:hover,
-.info.leaflet-bar a:focus,
-.leaflet-touch .info.leaflet-bar a:hover,
-.leaflet-touch .info.leaflet-bar a:focus {
-  background-color: transparent;
-  color: var(--link-hover);
-}
-
-.info td,
-.scope td {
-  width: 100%;
-  text-align: right;
-}
-
-.scope th {
-  padding-right: 8px;
-}
-
-#scopeTotalRow td,
-#minimumDepthRow td {
-  border-top: 1px solid var(--divider);
-  font-weight: bold;
-}
-
-#currentTideDirection svg {
-  margin-left: 2px;
-}
-
-#currentTideDirection svg path {
-  stroke: currentColor;
-  stroke-width: 1.5;
-}
-
-.scope {
-  padding: 5px;
-  font-size: 11pt;
-  line-height: 1.1;
-  background-color: var(--surface-bg);
-  color: var(--surface-fg);
-  display: flex;
-  flex-direction: column;
-}
-
-.scope > * + * {
-  margin-top: 10px;
-}
-
-.normal {
-  color: green;
-}
-
-.alarm {
-  color: yellow;
-}
-
-.warn {
-  color: orange;
-}
-
-.emergency {
-  color: red;
-}
-
-#loginPrompt,
-#anchorDown,
-#anchorUp,
-#zoneShapeSelect {
+#loginPrompt {
   display: none;
-}
-
-/* Raise/Drop: an anchor glyph stacked over a short label, centered, in a
-   80×80 square. */
-#anchorDown button,
-#anchorUp button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  padding: 0;
-  line-height: 1.1;
-}
-
-.anchorBtnIcon {
-  /* Scaled down from the 100px source so the glyph + label fit the 90px
-     square button. */
-  display: block;
-  width: 40px;
-  height: 40px;
-}
-
-.anchorBtnLabel {
-  margin-top: 4px;
-  font-size: 18px;
 }
 
 #loginPrompt button {
@@ -435,192 +247,6 @@ body,
      the button as the default inline-block lets the parent center it. */
   padding: 0;
   line-height: 26px;
-}
-
-/* Radius panel: a single bordered box (see the shared border rule above) split
-   into two rows — the radius value on top, the -/+ steppers below — separated
-   by lightweight inner rules. */
-#radiusControl {
-  display: flex;
-  flex-direction: column;
-  width: 80px;
-  background-color: var(--surface-bg);
-  /* Clip the borderless inner buttons to the panel's rounded corners. */
-  overflow: hidden;
-}
-
-/* Top row: the radius value; click to type an exact value. Sized smaller than
-   the toolbar default, and kept on one line, so a 3-digit value with a wider
-   unit (e.g. "333 ft") fits the 90px square without wrapping or clipping. */
-#setRadius {
-  display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  padding: 0 6px;
-  font-size: 14px;
-  white-space: nowrap;
-  /* Drop the UA button border so only the panel's outer border and the single
-     inner divider below show — otherwise they double up. */
-  border: none;
-  border-bottom: 1px solid var(--divider);
-  border-radius: 0;
-}
-
-/* Bottom row: two equal-width stepper columns. */
-#radiusStepper {
-  display: flex;
-  flex-direction: row;
-  flex: 1 1 0;
-  min-height: 0;
-}
-
-#decreaseRadius,
-#increaseRadius {
-  display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  /* Match Leaflet's zoom buttons (leaflet.css .leaflet-control-zoom-*). */
-  font:
-    bold 22px "Lucida Console",
-    Monaco,
-    monospace;
-}
-
-/* Lightweight inner rule between the two stepper columns. */
-#decreaseRadius {
-  border-right: 1px solid var(--divider);
-}
-
-/* Polygon panel: same two-row box as the radius panel — the radius value (tap
-   to type) on top, the sides selector below. */
-#polygonControl {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--surface-bg);
-  overflow: hidden;
-  font-size: 18px;
-}
-
-/* Bottom row: the sides selector. */
-#polygonControl select {
-  pointer-events: auto;
-  flex: 1 1 0;
-  min-height: 0;
-  width: 100%;
-  box-sizing: border-box;
-  -webkit-appearance: none;
-  appearance: none;
-  border: none;
-  border-radius: 0;
-  background-clip: padding-box;
-  background-color: var(--surface-bg);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='black' d='M0 0l6 8 6-8z'/></svg>");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 12px 8px;
-  color: var(--surface-fg);
-  font-family: inherit;
-  font-size: inherit;
-  padding: 0 28px 0 12px;
-}
-
-/* Top row: the radius value (tap to type). The shared #setRadius rule supplies
-   the 14px nowrap value styling and the divider below it; this just fills the
-   row height. */
-#polygonControl button {
-  flex: 1 1 0;
-  min-height: 0;
-  box-sizing: border-box;
-  border-radius: 0;
-}
-
-/* Shape picker: a small custom dropdown. A native <select> can't render an SVG
-   in its options, so the collapsed button shows the current shape's glyph and
-   clicking it drops a menu of shape glyphs below (built in ControlToolbar.js). */
-#zoneShapeSelect {
-  position: relative;
-}
-
-/* Match the raise/drop buttons: the current shape's glyph stacked over a short
-   label, centered in the 80×80 square. */
-#zoneShapeButton {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  padding: 0;
-  line-height: 1.1;
-}
-
-.zoneShapeCaret {
-  flex: 0 0 auto;
-  margin-left: 6px;
-  color: var(--surface-fg);
-}
-
-#zoneShapeMenu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  min-width: 100%;
-  box-sizing: border-box;
-  pointer-events: auto;
-  background-color: var(--surface-bg);
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  border-radius: 5px;
-  background-clip: padding-box;
-  /* Clip the borderless options to the menu's rounded corners. */
-  overflow: hidden;
-}
-
-/* The `hidden` attribute would normally set display:none, but the id rule
-   above (display:flex) outranks the UA [hidden] rule, so restore it here. */
-#zoneShapeMenu[hidden] {
-  display: none;
-}
-
-.zoneShapeOption {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 56px;
-  border: none;
-  border-radius: 0;
-}
-
-/* Lightweight inner rule between stacked options. */
-.zoneShapeOption + .zoneShapeOption {
-  border-top: 1px solid var(--divider);
-}
-
-.zoneShapeOption.active {
-  background-color: var(--surface-hover);
-}
-
-.zoneShapeOption:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.zoneShapeGlyph {
-  color: var(--surface-fg);
-}
-
-/* The dropdown arrow is a baked-in data URI (fill='black'); swap it for a
-   white one in dark mode since the fill can't be driven by a CSS variable. */
-html.dark #polygonControl select {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path fill='white' d='M0 0l6 8 6-8z'/></svg>");
 }
 
 .leaflet-control-home,
@@ -1041,128 +667,6 @@ html.dark #polygonControl select {
   background-repeat: no-repeat !important;
 }
 
-.anchorLineLabel textPath {
-  fill: var(--anchor-label-fill);
-  /* or whatever text color you want */
-  paint-order: stroke;
-  stroke: var(--anchor-label-halo);
-  /* halo behind the text for contrast over the map */
-  stroke-width: 3px;
-  /* thickness of the background */
-}
-
-.zoneHandle {
-  background: var(--zone-handle-bg);
-  border: 3px solid var(--zone-handle-border);
-  border-radius: 50%;
-  box-sizing: border-box;
-  cursor: grab;
-}
-
-.zoneHandle:active {
-  cursor: grabbing;
-}
-
-.zoneHandleGhost {
-  background: var(--zone-handle-ghost-bg);
-  border-width: 2px;
-  border-style: solid;
-  opacity: 0.7;
-}
-
-.zoneHandleGhost:hover {
-  opacity: 1;
-}
-
-/* Armed-for-delete state while a vertex is dragged onto an adjacent one.
-   !important overrides the inline border-color set by ZoneHandle.setStyle.
-   z-index lifts it above the target neighbor so the feedback stays visible. */
-.zoneHandleMergeArmed {
-  background: var(--zone-handle-armed) !important;
-  border-color: var(--zone-handle-armed) !important;
-  opacity: 1;
-  z-index: 1000 !important;
-}
-
-.wind-barb {
-  fill: var(--barb-fill);
-  stroke: var(--barb-stroke);
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-miterlimit: 10;
-  z-index: 100;
-
-  /* Adds a shadow: X-offset, Y-offset, Blur-radius, Color */
-  filter: drop-shadow(0px 0px 1px var(--barb-halo));
-}
-
-#windBarbContainer .wind-barb {
-  width: 24px;
-}
-
-.windBarbControl {
-  padding: 5px;
-  font-size: 11pt;
-  line-height: 1.1;
-  background-color: var(--surface-bg);
-  color: var(--surface-fg);
-  text-align: center;
-  width: 70px;
-}
-
-.tides {
-  width: 160px;
-  height: 75px;
-  background-color: var(--surface-bg);
-  color: var(--surface-fg);
-  overflow: hidden;
-  cursor: pointer;
-}
-
-.tides .tides-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  font-size: 11px;
-  font-family: inherit;
-}
-
-.tides .tides-line {
-  stroke: var(--tide-line);
-  stroke-width: 1.25;
-}
-
-.tides .tides-gradient-stop1 {
-  stop-color: var(--tide-line);
-  stop-opacity: 0.55;
-}
-
-.tides .tides-gradient-stop2 {
-  stop-color: var(--tide-line);
-  stop-opacity: 0.05;
-}
-
-.tides .tides-now {
-  stroke: var(--tide-now);
-  stroke-width: 1;
-  stroke-dasharray: 2 2;
-}
-
-.tides .tides-now-label {
-  fill: var(--tide-now);
-  font-weight: bold;
-}
-
-.tides .tides-marker-dot {
-  fill: var(--tide-marker);
-}
-
-.tides .tides-marker-height,
-.tides .tides-marker-time {
-  fill: var(--tide-marker);
-}
-
 .statusBar {
   padding: 5px;
   max-width: 320px;
@@ -1175,7 +679,7 @@ html.dark #polygonControl select {
 }
 
 /* Lift bottom controls above the attribution strip. --attributionHeight is
-   measured and set in JS (AnchorAlarm.updateAttribution) since the strip's
+   measured and set in JS (ChartPlotter.updateAttribution) since the strip's
    height varies with content wrapping. */
 .leaflet-bottom {
   bottom: var(--attributionHeight, 0px);

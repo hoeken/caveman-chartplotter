@@ -1,7 +1,7 @@
 // Reusable modal dialog. A fixed, full-viewport backdrop dims the page and
 // centers the dialog box both vertically and horizontally. Built to run on the
 // Navico MFD engine (Chromium 69): native confirm()/prompt() freeze that
-// embedded WebView (the anchor-raise confirm in particular stopped the whole
+// embedded WebView (a blocking confirm in particular stopped the whole
 // action), so every blocking dialog routes through here instead. The chrome
 // avoids CSS that engine lacks (flexbox `gap`, the <dialog> element); all
 // styling lives under the .modal* classes in style.css.

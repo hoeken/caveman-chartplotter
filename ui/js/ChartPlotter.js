@@ -1,7 +1,6 @@
-// AnchorAlarm is the composition root: it owns boat geometry and the live-update
-// lifecycle, delegates rendering to FleetLayer (vessels + tracks) and the four
-// HudPanels (Info/Scope/Wind/Home), and hands the anchor state machine to
-// AnchorController.
+// ChartPlotter is the composition root: it owns the map, boat geometry, and the
+// live-update lifecycle, and delegates rendering to FleetLayer (vessels +
+// tracks) and the HUD controls (status bar, settings, theme, home button).
 
 import { SignalKStream } from "./SignalKStream.js";
 import { SignalKHelper } from "./SignalKHelper.js";
@@ -9,15 +8,9 @@ import { AppState } from "./AppState.js";
 import { FleetLayer } from "./hud/FleetLayer.js";
 import { StatusBar } from "./hud/StatusBar.js";
 import { HomeButtonControl } from "./hud/HomeButtonControl.js";
-import { InfoPanel } from "./hud/InfoPanel.js";
-import { TidePanel } from "./hud/TidePanel.js";
-import { WindPanel } from "./hud/WindPanel.js";
-import { ScopePanel } from "./hud/ScopePanel.js";
 import { StaleReloader } from "./StaleReloader.js";
 import { loadSeascapeLayer } from "./SeascapeLoader.js";
 import { loadChartLayers, CHART_PANE, CHART_PANE_Z_INDEX } from "./ChartLayers.js";
-import { AnchorOverlay } from "./hud/AnchorOverlay.js";
-import { AnchorController } from "./AnchorController.js";
 import { ControlToolbar } from "./hud/ControlToolbar.js";
 import { ConfigPanel } from "./hud/ConfigPanel.js";
 import { ThemeControl } from "./hud/ThemeControl.js";
@@ -26,11 +19,14 @@ import { nativeTooltipsSuppressed, isNavicoMfd } from "./BrowserSupport.js";
 
 const UPDATE_INTERVAL_MS = 500;
 const INITIAL_LOAD_RETRY_MS = 5000;
+// Zoom used when framing the boat (initial load and the home button): close
+// enough to read a harbor or anchorage, wide enough for situational awareness.
+const HOME_ZOOM = 16;
 
 // Read a boolean-valued query parameter. Returns `fallback` when the param is
 // absent; otherwise a case-insensitive "true" is true and anything else
-// (including "false") is false. Drives the embedding controls — see the
-// `embedded` / `showAnchorControls` params documented in the README.
+// (including "false") is false. Drives the `embedded` param documented in the
+// README.
 function boolParam(params, name, fallback) {
   const raw = params.get(name);
   if (raw === null)
@@ -50,7 +46,7 @@ const SEASCAPE_OVERLAY_Z_INDEX = 250;
 // the cursor position and the two methods its internal stop() calls. Legacy
 // delta fields are negated too so the flip holds on the older wheel-event shapes
 // getWheelDelta falls back to. Used to reverse zoom direction on Navico MFDs;
-// see AnchorAlarm.reverseScrollWheelZoom.
+// see ChartPlotter.reverseScrollWheelZoom.
 function negateWheelDelta(e) {
   return {
     deltaX: -e.deltaX,
@@ -67,9 +63,9 @@ function negateWheelDelta(e) {
   };
 }
 
-class AnchorAlarm {
+class ChartPlotter {
   constructor() {
-    this.signalK = new SignalKHelper({ pluginName: "hoekens-anchor-alarm" });
+    this.signalK = new SignalKHelper({ pluginName: "caveman-chartplotter" });
     // A 401 on any auth-gated request (e.g. an expired session) pops the login
     // modal instead of bouncing to the SignalK admin login page.
     this.signalK.onUnauthorized = () => this.showLoginModal();
@@ -77,39 +73,23 @@ class AnchorAlarm {
     this.config = {
       fleetFilterRadius: 500,
       defaultBasemap: "Satellite",
-      defaultShape: "circle",
-      enableTidePanel: true,
-      enableWindPanel: true,
-      enableScopePanel: true,
       enableBoatLabels: true,
       enableOwnTrack: true,
       enableOtherTracks: true,
       enableChartLayers: true,
       enableSeascape: false,
-      scopes: "7,5,4,3",
-      glitchFilterSpeed: 0,
       hasCustomIcon: false,
     };
     this.state.loggedIn = false;
 
-    // URL controls for embedding the app in another dashboard (see README).
-    // `embedded=true` strips the HUD panels (tide/wind/scope/info) and the
-    // settings gear for a clean map; `showAnchorControls` overrides whether the
-    // top anchor toolbar is shown, defaulting to shown to match the standalone
-    // app. The two are independent: a fully bare map is embedded=true plus
-    // showAnchorControls=false.
+    // URL control for embedding the app in another dashboard (see README).
+    // `embedded=true` strips the settings gear and the login toolbar for a
+    // clean, read-only map.
     const params = new URLSearchParams(window.location.search);
     this.embedded = boolParam(params, "embedded", false);
-    this.showAnchorControls = boolParam(params, "showAnchorControls", true);
 
     this.map = undefined;
     this.fleetLayer = undefined;
-    this.anchorOverlay = undefined;
-    this.anchorController = undefined;
-    this.infoPanel = undefined;
-    this.tidePanel = undefined;
-    this.scopePanel = undefined;
-    this.windPanel = undefined;
     this.homeButton = undefined;
     this.configPanel = undefined;
     this.themeControl = undefined;
@@ -126,7 +106,7 @@ class AnchorAlarm {
   }
 
   static startup() {
-    const app = new AnchorAlarm();
+    const app = new ChartPlotter();
     app.init();
   }
 
@@ -228,7 +208,7 @@ class AnchorAlarm {
     }).setView([0, 0], 5);
     // Dedicated pane so local raster charts always draw above the base maps and
     // the Seascape overlay (both in the tile pane) while staying below the
-    // anchor overlay and vessel markers. See CHART_PANE in ChartLayers.
+    // vessel markers. See CHART_PANE in ChartLayers.
     this.map.createPane(CHART_PANE).style.zIndex = CHART_PANE_Z_INDEX;
     // The Navico MFDs' rotary/scroll input reports wheel deltas backwards, so
     // scroll-to-zoom runs inverted on those consoles. Flip it back there only.
@@ -239,23 +219,18 @@ class AnchorAlarm {
 
     this.toolbar = new ControlToolbar({
       parent: document.getElementById("map_container"),
-      getMapContainer: () => this.map && this.map.getContainer(),
-      onRaise: () => this.anchorController.requestRaise(),
-      onDrop: () => this.anchorController.requestDrop(),
-      onSetZone: (zoneConfig) => this.anchorController.setZone(zoneConfig),
       onLogin: () => this.showLoginModal(),
     });
-    // The anchor toolbar is shown by default; an embedding host can suppress it
-    // with showAnchorControls=false. update() only ever toggles the toolbar's
-    // children, never its container, so this container-level hide sticks.
-    if (!this.showAnchorControls)
+    // In embedded mode the login prompt is suppressed for a clean, read-only
+    // map — the host dashboard owns authentication.
+    if (this.embedded)
       this.toolbar.hide();
 
     this.signalK
       .fetchPluginInfo()
       .then((info) => {
         this.version = info.version;
-        console.log(`Hoeken's Anchor Alarm v${this.version}`);
+        console.log(`Caveman Chartplotter v${this.version}`);
       })
       .catch(() => { });
 
@@ -289,6 +264,12 @@ class AnchorAlarm {
     handler.enable();
   }
 
+  // Center the map on our own boat. Used for the initial view and by the home
+  // button.
+  centerOnBoat() {
+    this.map.setView(this.state.getPosition(), HOME_ZOOM);
+  }
+
   // === Initial load (one /self call, broken into phases) ===========================
 
   loadInitialData() {
@@ -310,18 +291,11 @@ class AnchorAlarm {
         await this.loadConfig();
         console.log("UI Config:", this.config);
 
-        // Apply the configured scope ratios and recompute so the first render
-        // reflects them (state.calculate above ran with the defaults).
-        this.state.setScopeRatios(this.config.scopes);
-        this.state.calculateScopes();
-        this.state.setGlitchFilterSpeed(this.config.glitchFilterSpeed);
-
         this.setupConnection();
         this.buildMap();
 
-        this.anchorController.estimateAnchorPosition();
         this.updateMap();
-        this.map.fitBounds(this.anchorOverlay.getBounds());
+        this.centerOnBoat();
       })
       .catch((error) => {
         const detail = error.statusText || error.message || "unknown error";
@@ -439,24 +413,17 @@ class AnchorAlarm {
 
   // Persist UI settings edited via the ConfigPanel. We merge into the live
   // config and re-render immediately so every setting takes effect without a
-  // reload: panel toggles and basemap re-render here, while the default
-  // watch-zone shape and fleet radius are pushed into the objects that captured
-  // them at construction. Returns the save promise so the dialog can report
-  // status.
+  // reload: the basemap re-renders here, while the fleet radius and track
+  // toggles are pushed into the objects that captured them at construction.
+  // Returns the save promise so the dialog can report status.
   saveConfig(newConfig) {
     Object.assign(this.config, newConfig);
-    // Scope ratios can change live; re-parse and recompute before re-rendering.
-    this.state.setScopeRatios(this.config.scopes);
-    this.state.calculateScopes();
-    this.state.setGlitchFilterSpeed(this.config.glitchFilterSpeed);
     this.setBasemap(this.config.defaultBasemap);
     this.setSeascapeEnabled(this.config.enableSeascape);
-    this.anchorController?.setDefaultShape(this.config.defaultShape);
     this.fleetLayer?.setFilterRadius(this.config.fleetFilterRadius);
     this.fleetLayer?.setShowLabels(this.config.enableBoatLabels);
     this.fleetLayer?.setShowOwnTrack(this.config.enableOwnTrack);
     this.fleetLayer?.setShowOtherTracks(this.config.enableOtherTracks);
-    this.fleetLayer?.setGlitchFilterSpeed(this.config.glitchFilterSpeed);
     this.updateMap();
     this.statusBar.clear("config-save");
     return this.signalK.saveConfig(newConfig).catch((error) => {
@@ -545,10 +512,7 @@ class AnchorAlarm {
     // Buttons - Top Right
     //
     this.homeButton = new HomeButtonControl({
-      onHome: (map) => {
-        this.anchorController.estimateAnchorPosition();
-        map.fitBounds(this.anchorOverlay.getBounds());
-      },
+      onHome: () => this.centerOnBoat(),
     });
     this.map.addControl(this.homeButton);
 
@@ -568,39 +532,6 @@ class AnchorAlarm {
     this.map.on("moveend", () => this.updateChartLayers());
     window.addEventListener("resize", () => this.updateAttribution());
 
-    // L.control.scale({ position: "bottomleft" }).addTo(this.map);
-
-    //
-    // Panels - Bottom Right
-    //
-    // In embedded mode all four HUD panels stay hidden regardless of config, so
-    // the map sits clean inside a host dashboard (updateMap enforces the same).
-    this.infoPanel = new InfoPanel();
-
-    this.tidePanel = new TidePanel();
-    if (!this.embedded && this.config.enableTidePanel)
-      this.tidePanel.show();
-    else
-      this.tidePanel.hide();
-
-    this.windPanel = new WindPanel();
-    if (!this.embedded && this.config.enableWindPanel)
-      this.windPanel.show();
-    else
-      this.windPanel.hide();
-
-    this.scopePanel = new ScopePanel();
-    if (!this.embedded && this.config.enableScopePanel)
-      this.scopePanel.show();
-    else
-      this.scopePanel.hide();
-
-    this.map.addControl(this.infoPanel);
-    this.map.addControl(this.tidePanel);
-    this.map.addControl(this.scopePanel);
-
-    this.map.addControl(this.windPanel);
-
     this.fleetLayer = new FleetLayer({
       app: this,
       map: this.map,
@@ -609,23 +540,6 @@ class AnchorAlarm {
       showLabels: this.config.enableBoatLabels,
       showOwnTrack: this.config.enableOwnTrack,
       showOtherTracks: this.config.enableOtherTracks,
-      glitchFilterSpeed: this.config.glitchFilterSpeed,
-    });
-
-    this.anchorOverlay = new AnchorOverlay({
-      state: this.state,
-      map: this.map,
-      onZoneChange: (zoneConfig) => this.anchorController.setZone(zoneConfig),
-      onZoneInput: (zoneConfig) => this.anchorController.previewZone(zoneConfig),
-    });
-
-    this.anchorController = new AnchorController({
-      appState: this.state,
-      overlay: this.anchorOverlay,
-      signalK: this.signalK,
-      statusBar: this.statusBar,
-      defaultShape: this.config.defaultShape,
-      onChange: () => this.updateMap(),
     });
   }
 
@@ -778,49 +692,9 @@ class AnchorAlarm {
   }
 
   updateMap() {
-    const anchored = this.state.isAnchored();
-
     this.toolbar.update(this.state);
     this.statusBar.update(this.state);
-    this.anchorOverlay.update(this.state);
     this.fleetLayer.update(this.state);
-
-    // In embedded mode every HUD panel stays hidden so the map reads clean
-    // inside a host dashboard; bail before the per-panel logic below.
-    if (this.embedded) {
-      this.infoPanel.hide();
-      this.scopePanel.hide();
-      this.tidePanel.hide();
-      this.windPanel.hide();
-      return;
-    }
-
-    // Tide/info live in the bottom-right while anchored; the scope panel
-    // takes the same slot when the anchor is up. Config flags gate each
-    // optional box; the panels themselves still hide on missing data.
-
-    if (anchored) {
-      this.infoPanel.update(this.state);
-      this.scopePanel.hide();
-    } else {
-      this.infoPanel.hide();
-      if (this.config.enableScopePanel)
-        this.scopePanel.update(this.state);
-      else
-        this.scopePanel.hide();
-    }
-
-    //always show tide if enabled
-    if (this.config.enableTidePanel)
-      this.tidePanel.update(this.state);
-    else
-      this.tidePanel.hide();
-
-    //always show wind if enabled
-    if (this.config.enableWindPanel)
-      this.windPanel.update(this.state);
-    else
-      this.windPanel.hide();
   }
 
   // === Live updates ===============================================================
@@ -850,4 +724,4 @@ class AnchorAlarm {
   }
 }
 
-AnchorAlarm.startup();
+ChartPlotter.startup();

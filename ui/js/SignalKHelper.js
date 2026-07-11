@@ -61,18 +61,6 @@ export class SignalKHelper {
       .then(SignalKHelper._toJsonOrReject);
   }
 
-  raiseAnchor() {
-    return this.pluginPost("raiseAnchor");
-  }
-
-  dropAnchor(position, zone) {
-    return this.pluginPost("dropAnchor", { position, zone });
-  }
-
-  setZone(zone) {
-    return this.pluginPost("setZone", { zone });
-  }
-
   pluginPost(action, data) {
     return this.pluginFetch(action, {
       method: "POST",
@@ -126,10 +114,10 @@ export class SignalKHelper {
   static _toJsonOrReject(response) {
     if (!response.ok) {
       // Our plugin routes reply with a JSON { message } body describing why the
-      // request failed (e.g. "boat is outside the watch zone — alarm would
-      // trigger immediately"). Read it so callers can surface the real reason
-      // rather than the bare HTTP status. Tolerate a non-JSON body (some
-      // SignalK errors are plain text) by falling back to no message.
+      // request failed (e.g. "image too large — max 500 KB"). Read it so
+      // callers can surface the real reason rather than the bare HTTP status.
+      // Tolerate a non-JSON body (some SignalK errors are plain text) by
+      // falling back to no message.
       return response
         .json()
         .catch(() => null)

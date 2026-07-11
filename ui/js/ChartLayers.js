@@ -14,16 +14,16 @@
 
 // Local charts draw in their own Leaflet pane, stacked above the tile pane —
 // where the base maps and the Seascape bathymetry overlay live — but below the
-// overlay/marker panes that hold the anchor circle and vessel markers. A
+// marker pane that holds the vessel markers. A
 // dedicated pane guarantees a local chart always draws on top of the base and
 // Seascape (and stays there when the user switches base maps, which re-inserts
 // base tiles into the tile pane), without depending on fragile z-index ordering
 // between siblings inside the single shared tile pane — where Seascape's
-// transform-positioned WebGL canvas would otherwise win. AnchorAlarm creates
+// transform-positioned WebGL canvas would otherwise win. ChartPlotter creates
 // this pane on the map before any chart layer is added.
 export const CHART_PANE = "chartPane";
-// Above tilePane (200: base maps + Seascape) and below overlayPane (400: anchor
-// overlay) and markerPane (600: vessel markers).
+// Above tilePane (200: base maps + Seascape) and below overlayPane (400) and
+// markerPane (600: vessel markers).
 export const CHART_PANE_Z_INDEX = 350;
 
 // SAS.Planet and similar tools export charts with a literal "Unnamed map" name;

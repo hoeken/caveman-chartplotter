@@ -16,11 +16,11 @@ longer generates them and does not need the `sharp`/`png-to-ico` toolchain.
 ## Icons
 
 Every app and web icon is derived from a single master,
-[branding/anchoralarm.png](branding/anchoralarm.png), by
+[branding/logo.png](branding/logo.png), by
 [scripts/generate-icons.js](scripts/generate-icons.js) (using
 [`sharp`](https://sharp.pixelplumbing.com/) and `png-to-ico`):
 
-- the Signal K appstore icon (`anchoralarm.png`, referenced by
+- the Signal K appstore icon (`logo.png`, referenced by
   `signalk.appIcon` in [package.json](package.json)),
 - the browser favicons (`favicon-16x16.png`, `favicon-32x32.png`,
   `favicon.ico`),
@@ -43,7 +43,7 @@ only when the master changes, then commit the regenerated icons alongside it.
 The master lives outside `ui/public/` on purpose so Vite never copies it into
 the build output, and it is excluded from the published npm tarball (`branding/`
 is not listed in `files` in [package.json](package.json)). To change the icon,
-replace `branding/anchoralarm.png` with a new square image (≥512×512), run
+replace `branding/logo.png` with a new square image (≥512×512), run
 `npm run generate:icons`, and commit the master together with the regenerated
 `ui/public/` icons.
 

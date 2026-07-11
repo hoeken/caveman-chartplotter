@@ -16,7 +16,7 @@
 import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
-import { AnchorError } from "./errors.js";
+import { PluginError } from "./errors.js";
 import { pickUiConfig, coerceUiConfig } from "./schema.js";
 
 const require = createRequire(import.meta.url);
@@ -148,7 +148,7 @@ export function register(app, plugin, router) {
   plugin.getOpenApi = () => openapi;
 
   function fail(res, err) {
-    if (err instanceof AnchorError) {
+    if (err instanceof PluginError) {
       app.debug(err.message);
       res.status(403).json({
         statusCode: 403,
@@ -164,36 +164,6 @@ export function register(app, plugin, router) {
       });
     }
   }
-
-  router.post("/dropAnchor", (req, res) => {
-    try {
-      plugin.dropAnchor({
-        position: req.body.position,
-        zone: req.body.zone,
-      });
-      res.json({ statusCode: 200, state: "COMPLETED" });
-    } catch (err) {
-      fail(res, err);
-    }
-  });
-
-  router.post("/setZone", (req, res) => {
-    try {
-      plugin.setZone(req.body.zone);
-      res.json({ statusCode: 200, state: "COMPLETED" });
-    } catch (err) {
-      fail(res, err);
-    }
-  });
-
-  router.post("/raiseAnchor", (req, res) => {
-    try {
-      plugin.raiseAnchor();
-      res.json({ statusCode: 200, state: "COMPLETED" });
-    } catch (err) {
-      fail(res, err);
-    }
-  });
 
   router.get("/ui-config", (req, res) => {
     // hasCustomIcon is derived (file existence), not a stored config key, so it

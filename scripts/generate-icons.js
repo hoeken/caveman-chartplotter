@@ -1,5 +1,5 @@
 // Generates every derived app/web icon from the single master at
-// branding/anchoralarm.png.
+// branding/logo.png.
 //
 // The master is intentionally large and lives outside Vite's publicDir so it
 // is never copied into the build output (public/) or shipped in the npm
@@ -21,7 +21,7 @@ import pngToIco from "png-to-ico";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const SOURCE = resolve(root, "branding/anchoralarm.png");
+const SOURCE = resolve(root, "branding/logo.png");
 const PUBLIC = resolve(root, "ui/public");
 const FAVICONS = resolve(PUBLIC, "favicons");
 
@@ -30,7 +30,7 @@ const FAVICONS = resolve(PUBLIC, "favicons");
 // home-screen icon, and the Android/PWA manifest icons.
 const PNG_TARGETS = [
   // Signal K appstore icon (package.json "signalk.appIcon").
-  { file: "anchoralarm.png", size: 512 },
+  { file: "logo.png", size: 512 },
   // Browser favicons.
   { file: "favicons/favicon-16x16.png", size: 16 },
   { file: "favicons/favicon-32x32.png", size: 32 },

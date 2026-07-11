@@ -15,12 +15,12 @@ curated CHANGELOG.md section is what users see before installing.
 No `NPM_TOKEN` is stored. Instead, configure the package on npmjs.com once:
 
 - npm package **Settings → Trusted Publisher → GitHub Actions**
-- Repository: `hoeken/hoekens-anchor-alarm`
+- Repository: `hoeken/caveman-chartplotter`
 - Workflow filename: `publish.yml`
 
 ## Cutting a release
 
-### 1. Make sure `master` is clean and pulled, ui is rebuilt, lint passes:
+### 1. Make sure `main` is clean and pulled, ui is rebuilt, lint passes:
 
 ```sh
 git status
@@ -49,14 +49,14 @@ git commit -am "release vX.Y.Z"
 npm run release
 ```
 
-This pushes `master` and the `vX.Y.Z` tag. The publish workflow takes it from
+This pushes `main` and the `vX.Y.Z` tag. The publish workflow takes it from
 there — no `npm login` or local `npm publish` needed.
 
 ### 5. Verify:
 
-- [GitHub Actions](https://github.com/hoeken/hoekens-anchor-alarm/actions) — the "Publish to npm" run is green
-- [GitHub Releases](https://github.com/hoeken/hoekens-anchor-alarm/releases) — the release shows your CHANGELOG notes
-- [npm](https://www.npmjs.com/package/hoekens-anchor-alarm) — the new version is live
+- [GitHub Actions](https://github.com/hoeken/caveman-chartplotter/actions) — the "Publish to npm" run is green
+- [GitHub Releases](https://github.com/hoeken/caveman-chartplotter/releases) — the release shows your CHANGELOG notes
+- [npm](https://www.npmjs.com/package/caveman-chartplotter) — the new version is live
 
 Pre-release tags (`v2.4.0-beta.1`, `-alpha`, `-rc`) are marked as
 pre-releases on GitHub and published under the matching npm dist-tag.

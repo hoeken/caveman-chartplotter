@@ -4,7 +4,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { EventEmitter } from "node:events";
 import { register } from "../src/http-routes.js";
-import { ValidationError, StateError } from "../src/errors.js";
 import { createMockApp } from "./mockApp.js";
 
 // Router stub that captures handlers by method + path so tests can invoke them.
@@ -93,105 +92,17 @@ describe("http-routes register()", () => {
     assert.ok(plugin.getOpenApi());
   });
 
-  describe("POST /dropAnchor", () => {
-    test("success returns 200 COMPLETED and forwards position + zone", () => {
-      let received;
-      plugin.dropAnchor = (args) => {
-        received = args;
-      };
-      wire();
-      const res = fakeRes();
-      router.handlers.post["/dropAnchor"](
-        { body: { position: { latitude: 1, longitude: 2 }, zone: { type: "circle" } } },
-        res,
-      );
-      assert.deepEqual(received, {
-        position: { latitude: 1, longitude: 2 },
-        zone: { type: "circle" },
-      });
-      assert.equal(res.statusCode, 200);
-      assert.deepEqual(res.body, { statusCode: 200, state: "COMPLETED" });
-    });
-
-    test("a ValidationError maps to 403 FAILED with the message", () => {
-      plugin.dropAnchor = () => {
-        throw new ValidationError("position required");
-      };
-      wire();
-      const res = fakeRes();
-      router.handlers.post["/dropAnchor"]({ body: {} }, res);
-      assert.equal(res.statusCode, 403);
-      assert.deepEqual(res.body, {
-        statusCode: 403,
-        state: "FAILED",
-        message: "position required",
-      });
-    });
-
-    test("a non-AnchorError maps to 500", () => {
-      plugin.dropAnchor = () => {
-        throw new Error("boom");
-      };
-      wire();
-      const res = fakeRes();
-      router.handlers.post["/dropAnchor"]({ body: {} }, res);
-      assert.equal(res.statusCode, 500);
-      assert.equal(res.body.state, "FAILED");
-    });
-  });
-
-  describe("POST /setZone", () => {
-    test("forwards the zone and returns 200", () => {
-      let received;
-      plugin.setZone = (zone) => {
-        received = zone;
-      };
-      wire();
-      const res = fakeRes();
-      router.handlers.post["/setZone"]({ body: { zone: { type: "sector" } } }, res);
-      assert.deepEqual(received, { type: "sector" });
-      assert.equal(res.statusCode, 200);
-    });
-
-    test("a StateError maps to 403", () => {
-      plugin.setZone = () => {
-        throw new StateError("no anchor is currently dropped");
-      };
-      wire();
-      const res = fakeRes();
-      router.handlers.post["/setZone"]({ body: {} }, res);
-      assert.equal(res.statusCode, 403);
-      assert.equal(res.body.message, "no anchor is currently dropped");
-    });
-  });
-
-  describe("POST /raiseAnchor", () => {
-    test("calls plugin.raiseAnchor and returns 200", () => {
-      let called = false;
-      plugin.raiseAnchor = () => {
-        called = true;
-      };
-      wire();
-      const res = fakeRes();
-      router.handlers.post["/raiseAnchor"]({ body: {} }, res);
-      assert.equal(called, true);
-      assert.equal(res.statusCode, 200);
-    });
-  });
-
   describe("GET /ui-config", () => {
     test("returns the whitelisted projection of the config", () => {
       plugin.configuration = {
         defaultBasemap: "Satellite",
-        zone: "secret",
-        state: "emergency",
+        somethingInternal: "secret",
       };
       wire();
       const res = fakeRes();
       router.handlers.get["/ui-config"]({}, res);
       assert.equal(res.body.defaultBasemap, "Satellite");
-      assert.equal("zone" in res.body, false);
-      assert.equal("state" in res.body, false);
+      assert.equal("somethingInternal" in res.body, false);
     });
 
     test("tolerates a missing configuration", () => {
@@ -234,15 +145,30 @@ describe("http-routes register()", () => {
       assert.equal(plugin.saveCount, 0);
     });
 
+    test("an unexpected error maps to 500 FAILED", () => {
+      plugin.configuration = {};
+      plugin.savePluginOptions = () => {
+        throw new Error("boom");
+      };
+      wire();
+      const res = fakeRes();
+      router.handlers.post["/ui-config"](
+        { body: { enableBoatLabels: false } },
+        res,
+      );
+      assert.equal(res.statusCode, 500);
+      assert.equal(res.body.state, "FAILED");
+    });
+
     test("initializes configuration when it was undefined", () => {
       plugin.configuration = undefined;
       wire();
       const res = fakeRes();
       router.handlers.post["/ui-config"](
-        { body: { enableTidePanel: false } },
+        { body: { enableBoatLabels: false } },
         res,
       );
-      assert.equal(plugin.configuration.enableTidePanel, false);
+      assert.equal(plugin.configuration.enableBoatLabels, false);
       assert.equal(res.statusCode, 200);
     });
 

@@ -3,7 +3,7 @@ package-lock.json
 public/leaflet
 public/favicons
 public/icons
-public/anchoralarm.png
+public/logo.png
 *.md
 *.js
 *.yml

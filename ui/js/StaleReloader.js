@@ -1,7 +1,7 @@
 // Reloads the page when it returns from a long background suspension or from
 // the bfcache. Mobile browsers can keep a tab alive for hours then revive it
 // with stale DOM state, so we force a fresh load instead of showing minutes-
-// old anchor data.
+// old chart data.
 
 export class StaleReloader {
   constructor({ staleThresholdMs }) {

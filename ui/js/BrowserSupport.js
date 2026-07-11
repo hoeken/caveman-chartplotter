@@ -31,7 +31,7 @@ export function setTitle(el, title) {
 // device identity to the webapp URL as query params — `mfd_name` and
 // `mfd_model_detail` — so their presence is a reliable marker that we're on an
 // MFD rather than a regular desktop/tablet browser. Callers use this to apply
-// MFD-only workarounds; see reverseScrollWheelZoom in AnchorAlarm, where the
+// MFD-only workarounds; see reverseScrollWheelZoom in ChartPlotter, where the
 // console's rotary/scroll input needs its zoom direction flipped.
 export function isNavicoMfd() {
   const params = new URLSearchParams(window.location.search);

@@ -15,69 +15,10 @@
 
 import { ValidationError } from "./errors.js";
 
-export const metas = {
-  "design.bowAnchorRollerHeight": {
-    units: "m",
-    displayUnits: {
-      category: "length",
-    },
-    description: "Height of the bow anchor roller above the water",
-  },
-  "design.totalAnchorChainLength": {
-    units: "m",
-    displayUnits: {
-      category: "length",
-    },
-    description: "Total length of the anchor chain/rode available",
-  },
-  "navigation.anchor.currentRadius": {
-    units: "m",
-    displayUnits: {
-      category: "length",
-    },
-    description: "Current distance from gps antenna to anchor",
-  },
-  "navigation.anchor.maxRadius": {
-    units: "m",
-    displayUnits: {
-      category: "length",
-    },
-    description: "Current distance from gps antenna to anchor",
-  },
-  "navigation.anchor.distanceFromBow": {
-    units: "m",
-    displayUnits: {
-      category: "length",
-    },
-    description: "Distance from the bow to the anchor",
-  },
-  "navigation.anchor.bearingTrue": {
-    units: "rad",
-    displayUnits: {
-      category: "angle",
-    },
-    description: "The true bearing from the bow to the anchor",
-  },
-  "navigation.anchor.apparentBearing": {
-    units: "rad",
-    displayUnits: {
-      category: "angle",
-    },
-    description: "The apparent bearing from the bow to the anchor, relative to the vessel heading",
-  },
-  "navigation.anchor.position": {
-    description: "Anchor position, probably an estimate at best",
-  },
-  "navigation.anchor.state": { "description": "Anchor alarm state: 'on' or 'off'" },
-  "navigation.anchor.watchZone": {
-    description: "Anchor watch zone configuration (shape + parameters). Anchor position is stored separately on navigation.anchor.position.",
-  },
-};
-
 export const requiredPaths = [
   {
     path: "navigation.position",
-    description: "Required - you need a GPS position of some sort to watch.",
+    description: "Required - you need a GPS position of some sort to plot.",
   },
   {
     path: "navigation.headingTrue",
@@ -99,36 +40,6 @@ export const requiredPaths = [
       "Optional - used to choose the correct icon. Edit Server -> Settings",
   },
   {
-    path: "environment.depth.belowSurface",
-    description:
-      "Optional - used for scope calculations. Provided by plugin derived-data",
-  },
-  {
-    path: "environment.depth.belowKeel",
-    description:
-      "Optional - used for minimum depth calculations. Provided by plugin derived-data or N2K",
-  },
-  {
-    path: "environment.wind.directionTrue",
-    description:
-      "Optional - used for wind barb display",
-  },
-  {
-    path: "environment.wind.speedApparent",
-    description:
-      "Optional - used for wind barb display",
-  },
-  {
-    path: "environment.tide",
-    description:
-      "Optional - used for scope calculations. Tide data provided by plugin signalk-tides",
-  },
-  {
-    path: "propulsion",
-    description:
-      "Optional - used for automatic alarm override. Install plugin or hardware to interface with your engines.",
-  },
-  {
     path: "sensors.gps.fromBow",
     description:
       "Optional - used to display size-accurate icon. GPS Antenna position. Edit Server -> Settings",
@@ -142,7 +53,7 @@ export const requiredPaths = [
 
 export function buildSchema(app) {
   const schemaData = {
-    title: "Hoeken's Anchor Alarm",
+    title: "Caveman Chartplotter",
     type: "object",
     properties: {
       pathChecks: {
@@ -158,41 +69,12 @@ export function buildSchema(app) {
         default: "Satellite",
         enum: ["Blank", "OpenStreetMap", "Satellite"],
       },
-      defaultShape: {
-        type: "string",
-        title: "Default Watch Zone Shape",
-        description:
-          "Shape used when estimating a new anchor position before it is dropped.",
-        default: "circle",
-        enum: ["circle", "sector", "polygon"],
-      },
       fleetFilterRadius: {
         type: "integer",
         title: "Fleet Filter Radius (m)",
         description:
           "Radius around own vessel to display other vessels and historical tracks.",
         default: 100000,
-      },
-      enableTidePanel: {
-        type: "boolean",
-        title: "Show Tide Box",
-        description:
-          "Show the tide chart panel while anchored (requires signalk-tides).",
-        default: true,
-      },
-      enableWindPanel: {
-        type: "boolean",
-        title: "Show Wind Box",
-        description:
-          "Show the wind speed/direction panel while anchored.",
-        default: true,
-      },
-      enableScopePanel: {
-        type: "boolean",
-        title: "Show Scope Box",
-        description:
-          "Show the scope/depth calculator panel while the anchor is up.",
-        default: true,
       },
       enableBoatLabels: {
         type: "boolean",
@@ -229,77 +111,6 @@ export function buildSchema(app) {
           "Overlay the Seascape bathymetry (water depth) chart on top of the base map by default. Needs an internet connection and a WebGL-capable browser; where either is missing the base map shows unchanged. Also toggleable at runtime in the layer control.",
         default: false,
       },
-      scopes: {
-        type: "string",
-        title: "Scope Ratios",
-        description:
-          "Comma-separated scope ratios (1–10) to calculate and display, e.g. \"7,5,4,3\". Invalid entries are ignored. Leave the field blank to turn off the scope calculations entirely. Also editable live from the web UI.",
-        default: "7,5,4,3",
-      },
-      state: {
-        title: "Alarm Severity",
-        description: "Anchor alarm notification level",
-        type: "string",
-        default: "emergency",
-        enum: ["alert", "warn", "alarm", "emergency"],
-      },
-      enableNormalNotifications: {
-        type: "boolean",
-        title: "Enable notifications for 'normal' state",
-        description:
-          "Emit a normal-state notification (Off, Watching, etc.) on notifications.navigation.anchor. Turn off to reduce clutter — when anchored the state already implies the alarm is watching. When off, the notification is cleared instead of showing a normal message; drag alarms are unaffected.",
-        default: true,
-      },
-      enableEngineCheck: {
-        type: "boolean",
-        title: "Engine Override Enabled",
-        description:
-          "Check propulsion.* to see if the engines are on before sending alarm notification.",
-        default: true,
-      },
-      allowZoneOutsideVessel: {
-        type: "boolean",
-        title: "Allow Watch Zone Outside Vessel Position",
-        description:
-          "Allow setting the anchor watch zone outside of the vessel's position. Useful for testing the alarm - normally a drop or zone that would trip the drag alarm immediately is refused.",
-        default: false,
-      },
-      anchorAlarmInterval: {
-        type: "number",
-        title:
-          "How often to send anchor alarm when dragging (in seconds).  Zero is continuously.",
-        default: 60,
-      },
-      noPositionAlarmTime: {
-        type: "number",
-        title:
-          "Send a notification if no position is received for the given number of seconds",
-        default: 60,
-      },
-      glitchFilterSpeed: {
-        type: "number",
-        title:
-          "Glitch filter: ignore position jumps implying a speed over this value (in m/s).  Zero disables the filter.",
-        default: 0,
-      },
-      bowAnchorRollerHeight: {
-        type: "number",
-        title:
-          "Height of the bow anchor roller above the waterline (in meters).  Used for scope calculations.",
-        default: 0,
-      },
-      totalAnchorChainLength: {
-        type: "number",
-        title:
-          "Total length of the anchor chain/rode (in meters).  Used to flag scopes longer than your available chain.",
-        default: 100,
-      },
-      zone: {
-        type: "string",
-        title: "Anchor Watch Zone (JSON)",
-        description: "Watch zone shape + parameters + anchor position as a single JSON string. ⚠️ Do not edit by hand — use the web UI. Blank when no anchor is dropped. Example: {\"type\":\"circle\",\"radius\":60,\"position\":{\"latitude\":0,\"longitude\":0}}.",
-        default: "",
-      },
     },
   };
 
@@ -321,22 +132,15 @@ export function buildSchema(app) {
 // Plugin config keys the web UI is allowed to read and write through
 // /ui-config. This is the whitelist of *which* keys are exposed; their types,
 // enums, and defaults all come from buildSchema above, so there's one source
-// of truth. Anchor state (`zone`) and alarm internals are deliberately
-// excluded — those are owned by the anchor service, not the settings form.
+// of truth.
 export const UI_CONFIG_KEYS = [
   "defaultBasemap",
-  "defaultShape",
   "fleetFilterRadius",
-  "glitchFilterSpeed",
-  "enableTidePanel",
-  "enableWindPanel",
-  "enableScopePanel",
   "enableBoatLabels",
   "enableOwnTrack",
   "enableOtherTracks",
   "enableChartLayers",
   "enableSeascape",
-  "scopes",
 ];
 
 // Project the UI-relevant subset out of a full plugin config (the /ui-config
@@ -406,37 +210,4 @@ export function applyDefaults(app, config) {
     }
   }
   return config;
-}
-
-// Upgrade older config shapes to the current v2.2 shape: a single `zone`
-// JSON string holding shape + parameters + anchor position. Returns true when
-// the config was actually mutated so callers can persist the result.
-// Idempotent.
-export function migrateConfig(config) {
-  let mutated = false;
-
-  // v2.1 legacy: top-level radius becomes a circle zone JSON string.
-  if (typeof config.zone !== "string" || config.zone.length === 0) {
-    const radius = Number(config.radius);
-    if (Number.isFinite(radius) && radius > 0) {
-      config.zone = JSON.stringify({ type: "circle", radius });
-      delete config.radius;
-      mutated = true;
-    }
-  }
-
-  return mutated;
-}
-
-// Parse the persisted zone JSON, returning null when the field is missing or
-// malformed. Callers that need a usable zone should fall back to
-// watchZoneFromConfig(null) which yields a default circle.
-export function readZoneConfig(config) {
-  if (typeof config.zone !== "string" || config.zone.length === 0)
-    return null;
-  try {
-    return JSON.parse(config.zone);
-  } catch {
-    return null;
-  }
 }

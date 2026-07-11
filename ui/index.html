@@ -10,7 +10,7 @@
     <!-- Tints the mobile browser toolbar/status bar; matches theme_color in
          site.webmanifest. -->
     <meta name="theme-color" content="#000000" />
-    <title>Hoeken's Anchor Alarm</title>
+    <title>Caveman Chartplotter</title>
 
     <!-- Add-to-home-screen launch behaviour. iOS Safari ignores the
          manifest's `display: standalone`, so these meta tags are what make the
@@ -20,7 +20,7 @@
          and black matches the manifest theme_color. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Anchor Alarm" />
+    <meta name="apple-mobile-web-app-title" content="Chartplotter" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
     <link
@@ -41,9 +41,6 @@
       href="favicons/favicon-16x16.png"
     />
     <link rel="manifest" href="site.webmanifest" />
-
-    <link rel="preload" href="icons/anchor.png" as="image" />
-    <link rel="preload" href="icons/crosshair.png" as="image" />
 
     <!--
       Theme selection, run synchronously before first paint (no flash).
@@ -77,8 +74,7 @@
     <script src="leaflet/leaflet.antimeridian.js"></script>
     <script src="leaflet/leaflet.BoatMarker.js"></script>
     <script src="leaflet/leaflet.hotline.js"></script>
-    <script src="leaflet/leaflet.textpath.js"></script>
-    <script type="module" src="js/AnchorAlarm.js"></script>
+    <script type="module" src="js/ChartPlotter.js"></script>
   </head>
 
   <body>

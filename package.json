@@ -1,7 +1,7 @@
 {
-  "name": "hoekens-anchor-alarm",
-  "version": "2.8.0",
-  "description": "Various shapes, scope calculator, scribble tracks, engine override, and to-scale icons.",
+  "name": "caveman-chartplotter",
+  "version": "1.0.0",
+  "description": "A simple, lightweight chart plotter for SignalK that runs anywhere — even on the older embedded browsers found in Navico MFDs.",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -19,8 +19,6 @@
   },
   "files": [
     "src",
-    "shared",
-    "docs/screenshots",
     "public",
     "CHANGELOG.md"
   ],
@@ -31,24 +29,13 @@
   "keywords": [
     "signalk-node-server-plugin",
     "signalk-webapp",
-    "signalk-category-utility",
-    "signalk-category-notifications"
+    "signalk-category-chart-plotters"
   ],
   "signalk": {
-    "appIcon": "anchoralarm.png",
-    "displayName": "Hoeken's Anchor Alarm",
-    "screenshots": [
-      "./docs/screenshots/watching.png",
-      "./docs/screenshots/circle.png",
-      "./docs/screenshots/sector.png",
-      "./docs/screenshots/polygon.png",
-      "./docs/screenshots/neighbors.png",
-      "./docs/screenshots/config.png"
-    ],
+    "appIcon": "logo.png",
+    "displayName": "Caveman Chartplotter",
     "recommends": [
-      "signalk-tides",
       "signalk-navico-embedder",
-      "@meri-imperiumi/signalk-autostate",
       "@signalk/tracks-plugin"
     ]
   },
@@ -63,13 +50,12 @@
   "dependencies": {
     "@signalk/tracks-plugin": "^2.0.2",
     "@turf/turf": "^7.3.5",
-    "d3": "^7.9.0",
     "mathjs": "^15.2.0",
     "simplify-js": "^1.2.4"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hoeken/hoekens-anchor-alarm.git"
+    "url": "git+https://github.com/hoeken/caveman-chartplotter.git"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

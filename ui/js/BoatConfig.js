@@ -1,8 +1,8 @@
 // BoatConfig is an immutable value object describing a vessel's geometry and
-// identity: LOA, beam, GPS antenna offsets, anchor roller height, AIS ship
-// type, and MMSI. The same shape covers our own boat (fromSelf, parsed from
-// /self) and AIS-detected vessels (fromVessel, parsed from a /vessels record
-// with permissive defaults for the often-missing fields).
+// identity: LOA, beam, GPS antenna offsets, AIS ship type, and MMSI. The same
+// shape covers our own boat (fromSelf, parsed from /self) and AIS-detected
+// vessels (fromVessel, parsed from a /vessels record with permissive defaults
+// for the often-missing fields).
 
 import { SignalKHelper } from "./SignalKHelper.js";
 import { ShipIcons } from "./ShipIcons.js";
@@ -11,8 +11,6 @@ const DEFAULTS = {
   name: "Unknown",
   loa: 14,
   beam: 4,
-  anchorRollerHeight: 0,
-  totalAnchorChainLength: 100,
   gpsBowXDistance: 0,
   gpsBowYDistance: 0,
   aisShipType: 36,
@@ -35,7 +33,7 @@ const positiveOr = (value, fallback) =>
 // broadcasting Class B with an LOA past this threshold is almost certainly a
 // misconfigured transponder (a common failure mode is a garbage or leftover
 // dimension field). Left alone those bogus dimensions draw an absurdly large
-// hull and anchor overlay that can dominate the map, so we discard them and
+// hull that can dominate the map, so we discard them and
 // fall back to defaults.
 const CLASS_B_MISCONFIG_LOA_M = 24;
 const CLASS_B_RECREATIONAL_TYPES = [36, 37];
@@ -50,8 +48,6 @@ export class BoatConfig {
     name,
     loa,
     beam,
-    anchorRollerHeight,
-    totalAnchorChainLength,
     gpsBowXDistance,
     gpsBowYDistance,
     aisShipType,
@@ -63,8 +59,6 @@ export class BoatConfig {
     this.name = name;
     this.loa = loa;
     this.beam = beam;
-    this.anchorRollerHeight = anchorRollerHeight;
-    this.totalAnchorChainLength = totalAnchorChainLength;
     this.gpsBowXDistance = gpsBowXDistance;
     this.gpsBowYDistance = gpsBowYDistance;
     this.aisShipType = aisShipType;
@@ -101,12 +95,6 @@ export class BoatConfig {
       config.beam = DEFAULTS.beam;
     }
 
-    config.anchorRollerHeight =
-      SignalKHelper.value(data, "design.bowAnchorRollerHeight") ??
-      DEFAULTS.anchorRollerHeight;
-    config.totalAnchorChainLength =
-      SignalKHelper.value(data, "design.totalAnchorChainLength") ||
-      DEFAULTS.totalAnchorChainLength;
     if (data.sensors?.gps) {
       config.gpsBowXDistance =
         SignalKHelper.value(data, "sensors.gps.fromCenter") ??
@@ -126,10 +114,10 @@ export class BoatConfig {
     }
 
     // Clamp the GPS antenna offsets to the hull so a bad or stale Signal K
-    // value can't place the antenna off the boat when we draw the icon and
-    // anchor overlay. Done after beam/loa are resolved to positive values
-    // above: X (from centerline) can't sit wider than half the beam, and Y
-    // (aft of the bow) must fall between the bow (0) and the stern (loa).
+    // value can't place the antenna off the boat when we draw the icon. Done
+    // after beam/loa are resolved to positive values above: X (from
+    // centerline) can't sit wider than half the beam, and Y (aft of the bow)
+    // must fall between the bow (0) and the stern (loa).
     const halfBeam = config.beam / 2;
     config.gpsBowXDistance = clamp(config.gpsBowXDistance, -halfBeam, halfBeam);
     config.gpsBowYDistance = clamp(config.gpsBowYDistance, 0, config.loa);
@@ -151,11 +139,6 @@ export class BoatConfig {
       x: this.beam / 2 + this.gpsBowXDistance,
       y: this.gpsBowYDistance,
     };
-  }
-
-  // Center-relative GPS offset, for GeoMath / AnchorOverlay consumers.
-  get gpsOffset() {
-    return { x: this.gpsBowXDistance, y: this.gpsBowYDistance };
   }
 
   get loaToBeam() {

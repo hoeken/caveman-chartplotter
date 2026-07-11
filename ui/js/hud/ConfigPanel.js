@@ -1,6 +1,6 @@
 // Leaflet map overlay control: a gear button that toggles a settings dialog
 // for the UI-editable plugin config. Only added to the map when the user is
-// logged in (see AnchorAlarm.buildMap). Each field change immediately saves
+// logged in (see ChartPlotter.buildMap). Each field change immediately saves
 // the whole form back through the onChange callback; the host is responsible
 // for persisting to the backend. Element IDs/classes are CSS hooks in
 // style.css; do not rename without updating the stylesheet.
@@ -9,13 +9,9 @@
 // host's onChange pushes each change into the running UI, so none of them
 // require a page reload.
 import { setTitle, supportsMaplibre } from "../BrowserSupport.js";
-import { DisplayUnit } from "../DisplayUnit.js";
 import { Modal } from "./Modal.js";
 
 const FIELDS = [
-  { key: "enableTidePanel", label: "Show Tide Panel", type: "checkbox" },
-  { key: "enableWindPanel", label: "Show Wind Panel", type: "checkbox" },
-  { key: "enableScopePanel", label: "Show Scope Panel", type: "checkbox" },
   { key: "enableBoatLabels", label: "Show Boat Name Labels", type: "checkbox" },
   { key: "enableOwnTrack", label: "Show My Boat Track", type: "checkbox" },
   { key: "enableOtherTracks", label: "Show Other Boat Tracks", type: "checkbox" },
@@ -27,50 +23,24 @@ const FIELDS = [
     ? [{ key: "enableSeascape", label: "Use Seascape Bathymetry", type: "checkbox" }]
     : []),
   {
-    key: "scopes",
-    label: "Scope Ratios",
-    type: "text",
-    placeholder: "7,5,4,3",
-    hint: "Comma-separated values 1–10. Leave blank to hide.",
-  },
-  {
     key: "defaultBasemap",
     label: "Default Basemap",
     type: "select",
     // Seascape is not a base map — it's a depth overlay that always appears in
     // the layer control when available; the "Use Seascape Bathymetry" setting
-    // above only sets whether it starts on (see AnchorAlarm.addSeascapeLayer).
+    // above only sets whether it starts on (see ChartPlotter.addSeascapeLayer).
     options: [
       // No-tiles base for offline/slow links or crews using only their own
-      // local charts (see AnchorAlarm.blankLayer).
+      // local charts (see ChartPlotter.blankLayer).
       ["Blank", "Blank"],
       ["OpenStreetMap", "OpenStreetMap"],
       ["Satellite", "Satellite"],
     ],
   },
   {
-    key: "defaultShape",
-    label: "Default Watch Zone Shape",
-    type: "select",
-    options: [
-      ["circle", "Circle"],
-      ["sector", "Sector"],
-      ["polygon", "Polygon"],
-    ],
-  },
-  {
     key: "fleetFilterRadius",
     label: "Fleet Filter Radius (m)",
     type: "number",
-  },
-  // Stored in SignalK base units (m/s) but shown/edited in the user's display
-  // unit for the given category — the "unit" type converts both ways.
-  {
-    key: "glitchFilterSpeed",
-    label: "Glitch Filter Max Speed",
-    type: "unit",
-    category: "speed",
-    hint: "Ignore position jumps faster than this. 0 disables.",
   },
 ];
 
@@ -170,7 +140,7 @@ export const ConfigPanel = L.Control.extend({
       "afterbegin",
       `<div id="configFooterMeta">
         <a id="configLogout" href="#">Log out</a>
-        <a id="configVersion" href="https://www.npmjs.com/package/hoekens-anchor-alarm" target="_blank" rel="noopener"></a>
+        <a id="configVersion" href="https://www.npmjs.com/package/caveman-chartplotter" target="_blank" rel="noopener"></a>
       </div>`,
     );
     this._version = this._modal.footer.querySelector("#configVersion");
@@ -287,13 +257,7 @@ export const ConfigPanel = L.Control.extend({
   // then label); everything else stacks label above the control. Inputs carry
   // a data-config-key so _buildDialog can find them after innerHTML.
   _rowHtml: function (field) {
-    // Unit fields get the display unit's symbol appended to the label; it's
-    // filled in at _populate time since the active units profile loads async.
-    const suffix =
-      field.type === "unit"
-        ? ` (<span data-unit-symbol="${field.key}"></span>)`
-        : "";
-    const label = `<span class="configLabel">${field.label}${suffix}</span>`;
+    const label = `<span class="configLabel">${field.label}</span>`;
     let control;
 
     if (field.type === "select") {
@@ -306,8 +270,6 @@ export const ConfigPanel = L.Control.extend({
     } else if (field.type === "text") {
       const placeholder = field.placeholder ? ` placeholder="${field.placeholder}"` : "";
       control = `<input type="text" class="configInput" data-config-key="${field.key}"${placeholder}>`;
-    } else if (field.type === "unit") {
-      control = `<input type="number" min="0" step="any" class="configInput" data-config-key="${field.key}">`;
     } else {
       control = `<input type="number" min="0" class="configInput" data-config-key="${field.key}">`;
     }
@@ -337,12 +299,6 @@ export const ConfigPanel = L.Control.extend({
         config[field.key] = input.checked;
       else if (field.type === "number")
         config[field.key] = Number(input.value);
-      else if (field.type === "unit")
-        // Convert the displayed value back to SignalK base units for storage.
-        config[field.key] = DisplayUnit.convertFromDisplay(
-          DisplayUnit.categoryConfig(field.category),
-          Number(input.value) || 0,
-        );
       else
         config[field.key] = input.value;
     }
@@ -353,23 +309,10 @@ export const ConfigPanel = L.Control.extend({
     for (const field of FIELDS) {
       const input = this._inputs[field.key];
       const value = config ? config[field.key] : undefined;
-      if (field.type === "checkbox") {
+      if (field.type === "checkbox")
         input.checked = Boolean(value);
-      } else if (field.type === "unit") {
-        // Stored in base units; shown in the user's display unit. The symbol
-        // is refreshed here too since the units profile loads asynchronously.
-        const cfg = DisplayUnit.categoryConfig(field.category);
-        const symbolEl = this._modal.body.querySelector(
-          `[data-unit-symbol="${field.key}"]`,
-        );
-        if (symbolEl)
-          symbolEl.textContent = cfg?.symbol || cfg?.targetUnit || "m/s";
-        const { converted } = DisplayUnit.convertToDisplay(cfg, Number(value) || 0);
-        input.value =
-          typeof converted === "number" ? parseFloat(converted.toFixed(2)) : "";
-      } else {
+      else
         input.value = value ?? "";
-      }
     }
   },
 
@@ -396,7 +339,7 @@ export const ConfigPanel = L.Control.extend({
     this._setIconState(config && config.hasCustomIcon);
     if (this._version) {
       const version = this.options.getVersion ? this.options.getVersion() : null;
-      this._version.textContent = version ? `Hoeken's Anchor Alarm v${version}` : "";
+      this._version.textContent = version ? `Caveman Chartplotter v${version}` : "";
     }
     if (this._modal)
       this._modal.open();

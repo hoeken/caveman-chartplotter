@@ -10,7 +10,6 @@
 // "error" (red).
 
 import { SignalKHelper } from "../SignalKHelper.js";
-import { DisplayUnit } from "../DisplayUnit.js";
 
 const LEVEL_COLORS = {
   status: "",
@@ -88,58 +87,6 @@ export const StatusBar = L.Control.extend({
       "heading-stale",
       state.heading && SignalKHelper.isStale(state.heading) ? "Heading data is stale." : null,
     );
-    this.set(
-      "below-keel-stale",
-      state.belowKeel && SignalKHelper.isStale(state.belowKeel)
-        ? "Depth Below Keel data is stale."
-        : null,
-    );
-    this.set(
-      "below-surface-stale",
-      state.belowSurface && SignalKHelper.isStale(state.belowSurface)
-        ? "Depth Below Surface data is stale."
-        : null,
-    );
-    this.set(
-      "twa-stale",
-      state.twa && SignalKHelper.isStale(state.twa)
-        ? "True Wind Angle data is stale."
-        : null,
-    );
-    this.set(
-      "aws-stale",
-      state.aws && SignalKHelper.isStale(state.aws)
-        ? "Apparent Wind Speed data is stale."
-        : null,
-    );
-
-    // Own-position glitch (see AppState.handleDelta): shown while the latest
-    // fix stands rejected, cleared by the next good fix. The implied speed is
-    // shown in the user's display units.
-    const glitch = state.positionGlitch;
-    this.set(
-      "position-glitch",
-      glitch
-        ? `Position glitch ignored${glitch.speed != null ? ` (${DisplayUnit.formatValue(glitch.speed, "speed")})` : ""}`
-        : null,
-    );
-
-    // notice.value is null when normal-state notifications are disabled.
-    let notice = state.anchor?.notification?.value;
-    if (notice) {
-      if (notice.state != "normal" && notice.message != "Watching") {
-        let level = "status";
-        if (notice.state == "alert" || notice.state == "warn")
-          level = "warning";
-        else if (notice.state == "alarm" || notice.state == "emergency")
-          level = "error";
-        this.set("notice-status", notice.message, level);
-      }
-      else
-        this.set("notice-status");
-    }
-    else
-      this.set("notice-status");
 
     this.set(
       "log-error",

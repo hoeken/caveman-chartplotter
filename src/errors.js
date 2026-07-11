@@ -13,23 +13,18 @@
  * limitations under the License.
  */
 
-export class AnchorError extends Error {
+// Base class for expected, user-facing failures. Routes translate these into
+// a 403 with the message in the body; anything else is a 500.
+export class PluginError extends Error {
   constructor(message) {
     super(message);
-    this.name = "AnchorError";
+    this.name = "PluginError";
   }
 }
 
-export class ValidationError extends AnchorError {
+export class ValidationError extends PluginError {
   constructor(message) {
     super(message);
     this.name = "ValidationError";
-  }
-}
-
-export class StateError extends AnchorError {
-  constructor(message) {
-    super(message);
-    this.name = "StateError";
   }
 }
