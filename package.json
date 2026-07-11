@@ -1,0 +1,86 @@
+{
+  "name": "hoekens-anchor-alarm",
+  "version": "2.8.0",
+  "description": "Various shapes, scope calculator, scribble tracks, engine override, and to-scale icons.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "release": "git tag -d v$npm_package_version; git tag v$npm_package_version && git push && git push origin v$npm_package_version",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "format": "eslint --fix . && prettier --write .",
+    "format:check": "eslint . && prettier --check .",
+    "prepare": "husky || true",
+    "generate:icons": "node scripts/generate-icons.js",
+    "build:ui": "vite build",
+    "prepack": "npm run build:ui",
+    "prepublishOnly": "npm test"
+  },
+  "files": [
+    "src",
+    "shared",
+    "docs/screenshots",
+    "public",
+    "CHANGELOG.md"
+  ],
+  "lint-staged": {
+    "*.js": "eslint --fix",
+    "*.{json,css,html}": "prettier --write"
+  },
+  "keywords": [
+    "signalk-node-server-plugin",
+    "signalk-webapp",
+    "signalk-category-utility",
+    "signalk-category-notifications"
+  ],
+  "signalk": {
+    "appIcon": "anchoralarm.png",
+    "displayName": "Hoeken's Anchor Alarm",
+    "screenshots": [
+      "./docs/screenshots/watching.png",
+      "./docs/screenshots/circle.png",
+      "./docs/screenshots/sector.png",
+      "./docs/screenshots/polygon.png",
+      "./docs/screenshots/neighbors.png",
+      "./docs/screenshots/config.png"
+    ],
+    "recommends": [
+      "signalk-tides",
+      "signalk-navico-embedder",
+      "@meri-imperiumi/signalk-autostate",
+      "@signalk/tracks-plugin"
+    ]
+  },
+  "author": {
+    "name": "Zach Hoeken",
+    "email": "hoeken@gmail.com"
+  },
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@signalk/tracks-plugin": "^2.0.2",
+    "@turf/turf": "^7.3.5",
+    "d3": "^7.9.0",
+    "mathjs": "^15.2.0",
+    "simplify-js": "^1.2.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoeken/hoekens-anchor-alarm.git"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "eslint": "^10.4.0",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "png-to-ico": "^3.0.1",
+    "prettier": "^3.8.3",
+    "sharp": "^0.35.2",
+    "vite": "^8.0.13"
+  }
+}

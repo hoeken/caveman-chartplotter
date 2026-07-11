@@ -1,0 +1,538 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Hoeken's Anchor Alarm API",
+    "version": "2.0.0",
+    "description": "HTTP API for dropping, adjusting, and raising the anchor managed by the Hoeken's Anchor Alarm plugin.",
+    "license": {
+      "name": "Apache-2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    }
+  },
+  "servers": [
+    {
+      "url": "/plugins/hoekens-anchor-alarm"
+    }
+  ],
+  "tags": [
+    {
+      "name": "anchor",
+      "description": "Anchor control operations"
+    },
+    {
+      "name": "config",
+      "description": "Plugin configuration exposed to the UI"
+    },
+    {
+      "name": "icon",
+      "description": "Custom own-boat icon shown on the map"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Position": {
+        "type": "object",
+        "required": ["latitude", "longitude"],
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "format": "double",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude in decimal degrees (WGS84)."
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude in decimal degrees (WGS84)."
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "required": ["statusCode", "state"],
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "example": 200
+          },
+          "state": {
+            "type": "string",
+            "enum": ["COMPLETED"]
+          }
+        }
+      },
+      "Config": {
+        "type": "object",
+        "description": "UI-relevant plugin configuration. Properties are omitted when unset; the UI falls back to its own defaults.",
+        "properties": {
+          "defaultBasemap": {
+            "type": "string",
+            "enum": ["OpenStreetMap", "Satellite", "Blank"],
+            "description": "Which map layer to show on load. \"Blank\" draws no tiles (offline / local-charts-only use)."
+          },
+          "defaultShape": {
+            "type": "string",
+            "enum": ["circle", "sector", "polygon"],
+            "description": "Default watch zone shape used when estimating a new anchor position."
+          },
+          "fleetFilterRadius": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Radius (meters) around own vessel for displaying other vessels and historical tracks."
+          },
+          "enableTidePanel": {
+            "type": "boolean",
+            "description": "Show the tide chart panel while anchored."
+          },
+          "enableWindPanel": {
+            "type": "boolean",
+            "description": "Show the wind speed/direction panel."
+          },
+          "enableScopePanel": {
+            "type": "boolean",
+            "description": "Show the scope/depth calculator panel while the anchor is up."
+          },
+          "enableBoatLabels": {
+            "type": "boolean",
+            "description": "Show other vessels' names as labels on the map (only once zoomed in enough to be legible)."
+          },
+          "enableSeascape": {
+            "type": "boolean",
+            "description": "Overlay the Seascape bathymetry (depth) chart on the base map by default. Requires internet + WebGL; toggleable at runtime in the layer control."
+          },
+          "hasCustomIcon": {
+            "type": "boolean",
+            "readOnly": true,
+            "description": "Derived (not stored): whether a custom own-boat icon has been uploaded via PUT /icon. The UI uses it to decide whether to render the custom icon and how to seed the settings preview."
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["statusCode", "state", "message"],
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "example": 403
+          },
+          "state": {
+            "type": "string",
+            "enum": ["FAILED"]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "AnchorError": {
+        "description": "Request rejected due to an anchor validation or state error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "statusCode": 403,
+              "state": "FAILED",
+              "message": "position with latitude and longitude required"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Unexpected internal error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "example": {
+              "statusCode": 500,
+              "state": "FAILED",
+              "message": "internal error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/dropAnchor": {
+      "post": {
+        "tags": ["anchor"],
+        "summary": "Drop the anchor at a given position",
+        "description": "Records the supplied position as the anchor location and (optionally) sets the alarm radius. Starts the anchor watch.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["position"],
+                "properties": {
+                  "position": {
+                    "$ref": "#/components/schemas/Position"
+                  },
+                  "zone": {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["circle", "sector"]
+                      },
+                      "radius": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "description": "Alarm radius in meters. Used by both `circle` and `sector` shapes."
+                      },
+                      "startAngle": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "maximum": 360,
+                        "description": "Sector only: clockwise bearing in degrees (0 = true north) of the start of the safe arc."
+                      },
+                      "endAngle": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "maximum": 360,
+                        "description": "Sector only: clockwise bearing in degrees (0 = true north) of the end of the safe arc. When `endAngle < startAngle` the arc wraps across 0°/360°."
+                      }
+                    },
+                    "description": "Watch zone configuration. If omitted, the previously configured zone is retained."
+                  },
+                  "radius": {
+                    "type": "number",
+                    "format": "double",
+                    "minimum": 0,
+                    "description": "Legacy: alarm radius in meters. If both `zone` and `radius` are provided, `zone` wins."
+                  }
+                }
+              },
+              "example": {
+                "position": {
+                  "latitude": 37.8199,
+                  "longitude": -122.4783
+                },
+                "zone": {
+                  "type": "circle",
+                  "radius": 30
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Anchor dropped successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/AnchorError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/setZone": {
+      "post": {
+        "tags": ["anchor"],
+        "summary": "Set the anchor watch zone",
+        "description": "Updates the watch zone (shape + parameters) for the currently dropped anchor. The anchor position is unchanged. Requires that an anchor has been dropped and that a GPS position is available.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["zone"],
+                "properties": {
+                  "zone": {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": ["circle", "sector"],
+                        "description": "Watch zone shape."
+                      },
+                      "radius": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "description": "Alarm radius in meters. Used by both `circle` and `sector` shapes."
+                      },
+                      "startAngle": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "maximum": 360,
+                        "description": "Sector only: clockwise bearing in degrees (0 = true north) of the start of the safe arc."
+                      },
+                      "endAngle": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "maximum": 360,
+                        "description": "Sector only: clockwise bearing in degrees (0 = true north) of the end of the safe arc. When `endAngle < startAngle` the arc wraps across 0°/360°."
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "zone": {
+                  "type": "circle",
+                  "radius": 45
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Zone updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/AnchorError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/raiseAnchor": {
+      "post": {
+        "tags": ["anchor"],
+        "summary": "Raise the anchor",
+        "description": "Clears the anchor position and radius and stops the anchor watch.",
+        "responses": {
+          "200": {
+            "description": "Anchor raised successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/AnchorError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/ui-config": {
+      "get": {
+        "tags": ["config"],
+        "summary": "Get UI-relevant plugin configuration",
+        "description": "Returns plugin configuration values that the web UI needs at startup. Unset properties are omitted; the UI applies its own defaults in that case.",
+        "responses": {
+          "200": {
+            "description": "Plugin configuration returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Config"
+                },
+                "example": {
+                  "fleetFilterRadius": 500
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["config"],
+        "summary": "Update UI-relevant plugin configuration",
+        "description": "Persists UI-editable settings. Only whitelisted properties are accepted; each is validated, written onto the live plugin configuration, and saved. Requires authentication.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Config"
+              },
+              "example": {
+                "enableTidePanel": false,
+                "fleetFilterRadius": 750
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration saved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/AnchorError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/icon": {
+      "get": {
+        "tags": ["icon"],
+        "summary": "Get the custom own-boat icon",
+        "description": "Serves the uploaded own-boat icon image. Returns 404 when no custom icon has been set.",
+        "responses": {
+          "200": {
+            "description": "The custom icon image.",
+            "content": {
+              "image/png": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/jpeg": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/gif": {
+                "schema": { "type": "string", "format": "binary" }
+              },
+              "image/webp": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "404": {
+            "description": "No custom icon is set.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "statusCode": 404,
+                  "state": "FAILED",
+                  "message": "no custom boat icon set"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["icon"],
+        "summary": "Upload (or replace) the custom own-boat icon",
+        "description": "Stores the request body as the own-boat icon, overwriting any existing one. The body is the raw image bytes; the type is detected from the file's magic bytes (the Content-Type header is not trusted). Accepts jpg, png, gif, or webp up to 500 KB. Requires authentication.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": { "schema": { "type": "string", "format": "binary" } },
+            "image/jpeg": {
+              "schema": { "type": "string", "format": "binary" }
+            },
+            "image/gif": { "schema": { "type": "string", "format": "binary" } },
+            "image/webp": { "schema": { "type": "string", "format": "binary" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Icon stored successfully.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty upload.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "statusCode": 400,
+                  "state": "FAILED",
+                  "message": "empty upload"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Image exceeds the 500 KB size limit.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "statusCode": 413,
+                  "state": "FAILED",
+                  "message": "image too large — max 500 KB"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Body is not a recognized jpg/png/gif/webp image.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "statusCode": 415,
+                  "state": "FAILED",
+                  "message": "unsupported image type — use jpg, png, gif, or webp"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["icon"],
+        "summary": "Delete the custom own-boat icon",
+        "description": "Removes any stored own-boat icon. Idempotent — succeeds whether or not an icon was set. The map reverts to the AIS ship-type icon. Requires authentication.",
+        "responses": {
+          "200": {
+            "description": "Icon removed (or none was set).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SuccessResponse" }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    }
+  }
+}
