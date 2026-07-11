@@ -813,17 +813,29 @@ table.vesselData td:nth-child(3) {
 }
 
 /* COG/SOG course vector: a dashed predictor line from each vessel's bow showing
-   where it will be after the configured time. A themed stroke plus a halo
-   (drop-shadow, same idea as the name labels) keeps it legible over any map
-   tile. These override Leaflet's inline path attributes since author CSS beats
-   SVG presentation attributes. The line is created non-interactive in JS, so it
-   never intercepts hover/clicks meant for the vessel or its track. */
+   where it will be after the configured time. A themed stroke keeps it legible,
+   with a halo supplied by a wider underlay line (.boat-course-vector-halo)
+   rather than a CSS drop-shadow filter — older Chromium (Chrome mobile,
+   Chromium 69) doesn't apply CSS filters to SVG elements, so the shadow worked
+   on desktop Chrome but silently vanished there. These override Leaflet's inline
+   path attributes since author CSS beats SVG presentation attributes. The line
+   is created non-interactive in JS, so it never intercepts hover/clicks meant
+   for the vessel or its track. */
 .boat-course-vector {
   stroke: var(--vector-stroke);
   stroke-width: 2;
   stroke-dasharray: 6 5;
   stroke-linecap: round;
   fill: none;
-  filter: drop-shadow(0 0 1px var(--vector-halo))
-    drop-shadow(0 0 1px var(--vector-halo));
+}
+
+/* Halo underlay for the course vector: a wider line with the same dash pattern,
+   drawn beneath the vector by FleetLayer so it reads as a ~1px outline around
+   each dash for legibility over any tile. */
+.boat-course-vector-halo {
+  stroke: var(--vector-halo);
+  stroke-width: 4;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+  fill: none;
 }

@@ -55,14 +55,39 @@ const TRACK_HOVER_TOLERANCE = 8;
 
 // Course-vector (COG/SOG predictor) styling. Non-interactive so it never steals
 // hover/clicks from the vessel marker or its track underneath. Stroke colour +
-// dash + halo are themed in style.css via .boat-course-vector; the color/weight
-// here are just a fallback if that stylesheet rule doesn't apply.
+// dash are themed in style.css via .boat-course-vector; the color/weight here
+// are just a fallback if that stylesheet rule doesn't apply.
 const COURSE_VECTOR_STYLE = {
   className: "boat-course-vector",
   interactive: false,
   color: "#111",
   weight: 2,
 };
+
+// Halo drawn as a wider polyline *beneath* the vector rather than as a CSS
+// drop-shadow filter: older Chromium (e.g. 69 on some tablets, Chrome mobile)
+// doesn't apply the CSS `filter` property to SVG elements, so the shadow
+// silently vanished there while rendering fine on desktop Chrome. A plain wider
+// line is universally supported. Themed in style.css via .boat-course-vector-halo.
+const COURSE_VECTOR_HALO_STYLE = {
+  className: "boat-course-vector-halo",
+  interactive: false,
+  color: "#fff",
+  weight: 4,
+};
+
+// Build a course vector as two stacked polylines — a wider halo underneath and
+// the themed dashed line on top — grouped so render/update/remove can treat the
+// pair as a single layer. LayerGroup paints children in array order, so the
+// halo (added first) sits below the line.
+function buildCourseVector(latlngs) {
+  const halo = L.polyline(latlngs, COURSE_VECTOR_HALO_STYLE);
+  const line = L.polyline(latlngs, COURSE_VECTOR_STYLE);
+  const group = L.layerGroup([halo, line]);
+  group._halo = halo;
+  group._line = line;
+  return group;
+}
 const DEFAULT_COURSE_VECTOR_MINUTES = 15;
 
 const GPS_ANTENNA_ICON = L.divIcon({
@@ -85,7 +110,7 @@ export class FleetLayer {
     this.showOtherTracks = showOtherTracks ?? true;
     this.vessels = {}; // mmsi -> L.BoatMarker (with .gpsAntennaMarker attached)
     this.vesselTracks = {}; // mmsi -> L.hotline
-    this.vesselVectors = {}; // mmsi -> L.polyline (COG/SOG course vector)
+    this.vesselVectors = {}; // mmsi -> L.layerGroup (COG/SOG course vector: halo + line)
     this.trackPointCounts = {}; // mmsi -> current point count in the hotline
     this.ownVessel = undefined;
     this.ownAntenna = undefined;
@@ -509,12 +534,13 @@ export class FleetLayer {
       return null;
     }
     if (layer) {
-      layer.setLatLngs(latlngs);
+      layer._halo.setLatLngs(latlngs);
+      layer._line.setLatLngs(latlngs);
       if (!this.map.hasLayer(layer))
         layer.addTo(this.map);
       return layer;
     }
-    return L.polyline(latlngs, COURSE_VECTOR_STYLE).addTo(this.map);
+    return buildCourseVector(latlngs).addTo(this.map);
   }
 
   // Recompute our own boat's course vector from the live COG/SOG in AppState.
