@@ -43,6 +43,9 @@
   --label-fg: #000000;
   /* boat name labels over the map */
   --label-halo: #ffffff;
+  --vector-stroke: #111111;
+  /* COG/SOG course vector (predictor line) over the map */
+  --vector-halo: #ffffff;
 }
 
 html.dark {
@@ -74,6 +77,8 @@ html.dark {
   --attribution-link: #66b2ff;
   --label-fg: #cdd1d6;
   --label-halo: #000000;
+  --vector-stroke: #e6e8eb;
+  --vector-halo: #000000;
 }
 
 /* Dark-mode overrides for Leaflet's own chrome (zoom/layers/popups). These
@@ -749,4 +754,20 @@ table.vesselData td:nth-child(3) {
    so the position stays correct, and still blocks pointer events. */
 .hide-boat-labels .boat-name-label {
   visibility: hidden;
+}
+
+/* COG/SOG course vector: a dashed predictor line from each vessel's bow showing
+   where it will be after the configured time. A themed stroke plus a halo
+   (drop-shadow, same idea as the name labels) keeps it legible over any map
+   tile. These override Leaflet's inline path attributes since author CSS beats
+   SVG presentation attributes. The line is created non-interactive in JS, so it
+   never intercepts hover/clicks meant for the vessel or its track. */
+.boat-course-vector {
+  stroke: var(--vector-stroke);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+  fill: none;
+  filter: drop-shadow(0 0 1px var(--vector-halo))
+    drop-shadow(0 0 1px var(--vector-halo));
 }

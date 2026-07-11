@@ -35,6 +35,13 @@ export class AppState {
             policy: "fixed",
             sendMeta: "all",
           },
+          {
+            path: "navigation.speedOverGround",
+            period: DELTA_FAST_SPEED,
+            format: "full",
+            policy: "fixed",
+            sendMeta: "all",
+          },
         ],
       },
     );
@@ -96,9 +103,12 @@ export class AppState {
 
     this.currentCoordinates = this.extract(data, "navigation.position");
     this.heading = this.extract(data, "navigation.headingTrue") ?? this.heading;
-    // COG is kept solely as a heading fallback for boats with no heading sensor.
+    // COG is kept as a heading fallback for boats with no heading sensor, and,
+    // with SOG below, drives our own course vector (see FleetLayer).
     this.cog =
       this.extract(data, "navigation.courseOverGroundTrue") ?? this.cog;
+    this.sog =
+      this.extract(data, "navigation.speedOverGround") ?? this.sog;
   }
 
   handleDelta(timestamp, delta) {
@@ -124,6 +134,8 @@ export class AppState {
       this.heading = apply(this.heading);
     else if (path == "navigation.courseOverGroundTrue")
       this.cog = apply(this.cog);
+    else if (path == "navigation.speedOverGround")
+      this.sog = apply(this.sog);
     // else if (!path.startsWith("notifications"))
     //   console.log(`[websocket] Ignoring: ${path}`);
   }

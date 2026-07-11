@@ -42,6 +42,22 @@ const FIELDS = [
     label: "Fleet Filter Radius (m)",
     type: "number",
   },
+  {
+    // COG/SOG course vector (predictor line) length, in minutes of travel.
+    // "None (Off)" is the 0 option; the value round-trips as an integer through
+    // the backend schema (see schema.js courseVectorMinutes).
+    key: "courseVectorMinutes",
+    label: "Course Vector Line",
+    type: "select",
+    options: [
+      ["0", "None (Off)"],
+      ["5", "5 minutes"],
+      ["10", "10 minutes"],
+      ["15", "15 minutes"],
+      ["30", "30 minutes"],
+      ["60", "60 minutes"],
+    ],
+  },
 ];
 
 export const ConfigPanel = L.Control.extend({

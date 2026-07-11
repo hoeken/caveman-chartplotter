@@ -78,6 +78,7 @@ class ChartPlotter {
       enableOtherTracks: true,
       enableChartLayers: true,
       enableSeascape: false,
+      courseVectorMinutes: 15,
       hasCustomIcon: false,
     };
     this.state.loggedIn = false;
@@ -424,6 +425,7 @@ class ChartPlotter {
     this.fleetLayer?.setShowLabels(this.config.enableBoatLabels);
     this.fleetLayer?.setShowOwnTrack(this.config.enableOwnTrack);
     this.fleetLayer?.setShowOtherTracks(this.config.enableOtherTracks);
+    this.fleetLayer?.setCourseVectorMinutes(this.config.courseVectorMinutes);
     this.updateMap();
     this.statusBar.clear("config-save");
     return this.signalK.saveConfig(newConfig).catch((error) => {
@@ -540,6 +542,7 @@ class ChartPlotter {
       showLabels: this.config.enableBoatLabels,
       showOwnTrack: this.config.enableOwnTrack,
       showOtherTracks: this.config.enableOtherTracks,
+      courseVectorMinutes: this.config.courseVectorMinutes,
     });
   }
 

@@ -61,6 +61,25 @@ describe("coerceUiConfig()", () => {
       ValidationError,
     );
   });
+
+  test("accepts the <select> string form of an integer enum value", () => {
+    // The settings dialog posts courseVectorMinutes as a string ("15"); it must
+    // coerce to the integer 15 and pass the enum check.
+    const updates = coerceUiConfig(APP, { courseVectorMinutes: "15" });
+    assert.equal(updates.courseVectorMinutes, 15);
+  });
+
+  test("accepts 0 (off) for the course vector", () => {
+    const updates = coerceUiConfig(APP, { courseVectorMinutes: "0" });
+    assert.equal(updates.courseVectorMinutes, 0);
+  });
+
+  test("throws ValidationError on an integer-enum violation", () => {
+    assert.throws(
+      () => coerceUiConfig(APP, { courseVectorMinutes: 7 }),
+      ValidationError,
+    );
+  });
 });
 
 describe("applyDefaults()", () => {
@@ -74,6 +93,7 @@ describe("applyDefaults()", () => {
     assert.equal(config.enableOtherTracks, true);
     assert.equal(config.enableChartLayers, true);
     assert.equal(config.enableSeascape, false);
+    assert.equal(config.courseVectorMinutes, 15);
   });
 
   test("never overwrites a value the user already set", () => {

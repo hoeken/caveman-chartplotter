@@ -74,6 +74,11 @@
             "type": "boolean",
             "description": "Overlay the Seascape bathymetry (depth) chart on the base map by default. Requires internet + WebGL; toggleable at runtime in the layer control."
           },
+          "courseVectorMinutes": {
+            "type": "integer",
+            "enum": [0, 5, 10, 15, 30, 60],
+            "description": "Length, in minutes of travel, of the COG/SOG course vector (predictor line) drawn from each vessel's bow. 0 disables it."
+          },
           "hasCustomIcon": {
             "type": "boolean",
             "readOnly": true,

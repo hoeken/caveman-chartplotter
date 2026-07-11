@@ -111,6 +111,22 @@ export function buildSchema(app) {
           "Overlay the Seascape bathymetry (water depth) chart on top of the base map by default. Needs an internet connection and a WebGL-capable browser; where either is missing the base map shows unchanged. Also toggleable at runtime in the layer control.",
         default: false,
       },
+      courseVectorMinutes: {
+        type: "integer",
+        title: "Course Vector Time (minutes)",
+        description:
+          "Draw a COG/SOG course vector (predictor line) from each vessel's bow, this many minutes of travel long. Set to 0 (None) to turn it off.",
+        enum: [0, 5, 10, 15, 30, 60],
+        enumNames: [
+          "None (Off)",
+          "5 minutes",
+          "10 minutes",
+          "15 minutes",
+          "30 minutes",
+          "60 minutes",
+        ],
+        default: 15,
+      },
     },
   };
 
@@ -141,6 +157,7 @@ export const UI_CONFIG_KEYS = [
   "enableOtherTracks",
   "enableChartLayers",
   "enableSeascape",
+  "courseVectorMinutes",
 ];
 
 // Project the UI-relevant subset out of a full plugin config (the /ui-config
@@ -155,30 +172,40 @@ export function pickUiConfig(config = {}) {
 // Coerce/validate one value against its JSON Schema property. Mirrors how
 // SignalK's admin form treats the same schema. Throws ValidationError (→ 403)
 // on anything that doesn't fit.
+//
+// Type coercion happens before the enum check so an integer enum accepts the
+// string form a value takes coming from an HTML <select> (e.g. "15" → 15 → is
+// 15 one of the allowed values?), not just the already-numeric admin form.
 function coerceToSchema(key, prop, value) {
   if (!prop)
     throw new ValidationError(`unknown config field: ${key}`);
 
-  if (Array.isArray(prop.enum) && !prop.enum.includes(value))
-    throw new ValidationError(`${key} must be one of: ${prop.enum.join(", ")}`);
-
+  let coerced;
   switch (prop.type) {
     case "string":
       if (typeof value !== "string")
         throw new ValidationError(`${key} must be a string`);
-      return value;
+      coerced = value;
+      break;
     case "integer":
     case "number": {
       const n = Number(value);
       if (!Number.isFinite(n))
         throw new ValidationError(`${key} must be a number`);
-      return prop.type === "integer" ? Math.round(n) : n;
+      coerced = prop.type === "integer" ? Math.round(n) : n;
+      break;
     }
     case "boolean":
-      return Boolean(value);
+      coerced = Boolean(value);
+      break;
     default:
       throw new ValidationError(`unsupported schema type for ${key}`);
   }
+
+  if (Array.isArray(prop.enum) && !prop.enum.includes(coerced))
+    throw new ValidationError(`${key} must be one of: ${prop.enum.join(", ")}`);
+
+  return coerced;
 }
 
 // Validate an incoming /ui-config POST body against the plugin schema,

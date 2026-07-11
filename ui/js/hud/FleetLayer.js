@@ -20,6 +20,7 @@ import { bearing, distance, point, radiansToDegrees } from "@turf/turf";
 import { SignalKHelper } from "../SignalKHelper.js";
 import { BoatConfig } from "../BoatConfig.js";
 import { DisplayUnit } from "../DisplayUnit.js";
+import { courseVectorLatLngs } from "../CourseVector.js";
 
 // How often to prune silent vessels and re-render the delta-fed cache.
 // Decoupled from the delta arrival rate so a busy anchorage doesn't trigger a
@@ -52,6 +53,18 @@ const DIM_WEIGHT = 1;
 // the hover/hit tolerance so the historical path is actually hoverable.
 const TRACK_HOVER_TOLERANCE = 8;
 
+// Course-vector (COG/SOG predictor) styling. Non-interactive so it never steals
+// hover/clicks from the vessel marker or its track underneath. Stroke colour +
+// dash + halo are themed in style.css via .boat-course-vector; the color/weight
+// here are just a fallback if that stylesheet rule doesn't apply.
+const COURSE_VECTOR_STYLE = {
+  className: "boat-course-vector",
+  interactive: false,
+  color: "#111",
+  weight: 2,
+};
+const DEFAULT_COURSE_VECTOR_MINUTES = 15;
+
 const GPS_ANTENNA_ICON = L.divIcon({
   className: "gps-antenna-dot",
   html: '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" fill="#000" viewBox="0 0 16 16" style="display:block"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4"/></svg>',
@@ -59,7 +72,7 @@ const GPS_ANTENNA_ICON = L.divIcon({
   iconAnchor: [6, 6],
 });
 export class FleetLayer {
-  constructor({ app, map, ownMmsi, filterRadius, showLabels, showOwnTrack, showOtherTracks }) {
+  constructor({ app, map, ownMmsi, filterRadius, showLabels, showOwnTrack, showOtherTracks, courseVectorMinutes }) {
     this.app = app;
     this.map = map;
     this.ownMmsi = ownMmsi;
@@ -72,11 +85,15 @@ export class FleetLayer {
     this.showOtherTracks = showOtherTracks ?? true;
     this.vessels = {}; // mmsi -> L.BoatMarker (with .gpsAntennaMarker attached)
     this.vesselTracks = {}; // mmsi -> L.hotline
+    this.vesselVectors = {}; // mmsi -> L.polyline (COG/SOG course vector)
     this.trackPointCounts = {}; // mmsi -> current point count in the hotline
     this.ownVessel = undefined;
     this.ownAntenna = undefined;
+    this.ownVector = undefined; // our own boat's course vector, or undefined
     this.ownBoatConfig = undefined;
     this.fleetTimer = null;
+    // Course-vector length in minutes of travel; 0 (or a falsy setting) is off.
+    this.courseVectorMinutes = normalizeVectorMinutes(courseVectorMinutes);
     // mmsi -> vessel tree, shaped like a /vessels payload entry and built from
     // deltas + a one-shot /vessels seed. Each entry carries a numeric _lastSeen
     // for TTL pruning.
@@ -106,6 +123,11 @@ export class FleetLayer {
     // a single CSS rule hides every label at once.
     this.map.on("zoomend", () => this.updateLabelVisibility());
     this.updateLabelVisibility();
+
+    // Course vectors start at each boat's drawn bow, which shifts on zoom
+    // because the icon is size-clamped when zoomed out — so re-anchor them after
+    // every zoom, not just on the next data tick.
+    this.map.on("zoomend", () => this.refreshCourseVectors());
 
     this.loadInitialData();
   }
@@ -143,6 +165,18 @@ export class FleetLayer {
       return;
     this.showOtherTracks = next;
     this.applyTrackVisibility();
+  }
+
+  // Apply a new course-vector length live (from the settings dialog). Redraw our
+  // own vector immediately and re-render the fleet cache so every AIS vessel's
+  // vector updates too; 0 removes them all.
+  setCourseVectorMinutes(minutes) {
+    const next = normalizeVectorMinutes(minutes);
+    if (next === this.courseVectorMinutes)
+      return;
+    this.courseVectorMinutes = next;
+    this.updateOwnVector();
+    this.renderFromCache();
   }
 
   // Track keys are MMSI strings; our own boat's track is the one keyed by
@@ -409,6 +443,7 @@ export class FleetLayer {
     this.updateOwnPosition(state.getPosition(), state.boatConfig.heading);
     const pos = state.getPosition();
     this.addPointToTrack(this.ownMmsi, pos.lat, pos.lng);
+    this.updateOwnVector();
   }
 
   // Own boat is kept outside the AIS vessels dict so syncOtherVessels never
@@ -453,6 +488,79 @@ export class FleetLayer {
     if (!this.ownVessel)
       return;
     this.ownVessel.setBoatIcon(url || this.ownBoatConfig.icon);
+  }
+
+  // Draw/update/remove one vessel's course vector (COG/SOG predictor). `start`
+  // is the vessel's drawn bow (from BoatMarker.getBoatBow), so the line begins
+  // at the icon's tip at any zoom — including zoomed out, where the icon is drawn
+  // larger than scale. Returns the polyline layer, or null when no vector should
+  // be shown (feature off, boat stationary, or missing COG/SOG) — in which case
+  // any existing line is removed from the map.
+  renderCourseVector(layer, start, cogRad, sogMps) {
+    const latlngs = courseVectorLatLngs({
+      start,
+      cogRad,
+      sogMps,
+      minutes: this.courseVectorMinutes,
+    });
+    if (!latlngs) {
+      if (layer)
+        this.map.removeLayer(layer);
+      return null;
+    }
+    if (layer) {
+      layer.setLatLngs(latlngs);
+      if (!this.map.hasLayer(layer))
+        layer.addTo(this.map);
+      return layer;
+    }
+    return L.polyline(latlngs, COURSE_VECTOR_STYLE).addTo(this.map);
+  }
+
+  // Recompute our own boat's course vector from the live COG/SOG in AppState.
+  // Called every update tick, on zoom, and whenever the vector-length setting
+  // changes.
+  updateOwnVector() {
+    if (!this.ownVessel)
+      return;
+    const state = this.app.state;
+    this.ownVector = this.renderCourseVector(
+      this.ownVector,
+      this.ownVessel.getBoatBow() ?? this.ownVessel.getLatLng(),
+      state.cog?.value,
+      state.sog?.value,
+    );
+  }
+
+  // Recompute one AIS vessel's course vector, keyed by mmsi alongside its marker
+  // and track so it's created, updated, and removed in lockstep with them. The
+  // motion is stashed on the marker so a zoom — which moves the drawn bow — can
+  // redraw the vector (refreshCourseVectors) without a fresh delta.
+  updateVesselVector(mmsi, marker, cogRad, sogMps) {
+    marker._vectorCog = cogRad;
+    marker._vectorSog = sogMps;
+    const layer = this.renderCourseVector(
+      this.vesselVectors[mmsi] ?? null,
+      marker.getBoatBow() ?? marker.getLatLng(),
+      cogRad,
+      sogMps,
+    );
+    if (layer)
+      this.vesselVectors[mmsi] = layer;
+    else
+      delete this.vesselVectors[mmsi];
+  }
+
+  // Redraw every course vector from each marker's current drawn bow. The bow
+  // moves on zoom (the icon is size-clamped when zoomed out), so the vectors
+  // must re-anchor to it; own COG/SOG is read live, others' from the values
+  // stashed by updateVesselVector.
+  refreshCourseVectors() {
+    this.updateOwnVector();
+    for (const mmsi in this.vessels) {
+      const marker = this.vessels[mmsi];
+      this.updateVesselVector(mmsi, marker, marker._vectorCog, marker._vectorSog);
+    }
   }
 
   // Initial bulk history load from /tracks. Includes self.
@@ -585,6 +693,10 @@ export class FleetLayer {
           delete this.vesselTracks[mmsi];
           delete this.trackPointCounts[mmsi];
         }
+        if (this.vesselVectors[mmsi]) {
+          this.map.removeLayer(this.vesselVectors[mmsi]);
+          delete this.vesselVectors[mmsi];
+        }
       }
     }
   }
@@ -624,6 +736,7 @@ export class FleetLayer {
     marker.gpsAntennaMarker.setLatLng([position.latitude, position.longitude]);
 
     this.addPointToTrack(vessel.mmsi, position.latitude, position.longitude);
+    this.updateVesselVector(vessel.mmsi, marker, config.cog, config.sog);
   }
 
   addNewVessel(vessel, position, heading, distance, bearing) {
@@ -687,6 +800,8 @@ export class FleetLayer {
       );
       this.trackPointCounts[vessel.mmsi] = 1;
     }
+
+    this.updateVesselVector(vessel.mmsi, marker, config.cog, config.sog);
   }
 
   // Build the popup as a live DOM element. The element is kept on the marker
@@ -824,6 +939,17 @@ export class FleetLayer {
     else
       return SIMPLIFY_THRESHOLD_OTHERS;
   }
+}
+
+// Coerce a course-vector-minutes setting to a non-negative number, falling back
+// to the default only when it's absent. The value arrives as a number from the
+// backend config but as a string ("15") from the settings <select>, and 0 must
+// stay 0 (feature off) rather than snap back to the default.
+function normalizeVectorMinutes(minutes) {
+  if (minutes == null)
+    return DEFAULT_COURSE_VECTOR_MINUTES;
+  const n = Number(minutes);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 // Accepts either [lat, lng, alt] tuples (from bulk history) or L.LatLng

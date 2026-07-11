@@ -103,18 +103,12 @@ L.BoatMarker = L.Marker.extend({
     return this;
   },
 
-  // The boat icon's geometric center as a map layer point, accounting for the
-  // current heading. getLatLng() tracks the GPS antenna (the marker's anchor),
-  // which can sit anywhere on the hull; the center is offset from it by half
-  // the icon's size and rotates about the antenna along with the image.
-  getBoatCenter() {
-    if (!this._map || this._wPx === undefined) return null;
-
+  // Map a point in the unrotated icon frame — given as its px offset (dx, dy)
+  // from the GPS antenna — to a map layer point, applying the current heading.
+  // The image rotates about the antenna (CSS rotate, clockwise), so the offset
+  // is rotated the same way before being added to the antenna's layer point.
+  _iconOffsetToLayerPoint(dx, dy) {
     const anchor = this._map.latLngToLayerPoint(this.getLatLng());
-    // Antenna→center vector in the unrotated icon frame (px).
-    const dx = this._wPx / 2 - this._oX;
-    const dy = this._hPx / 2 - this._oY;
-    // Rotate it the same way the image is rotated (CSS rotate, clockwise).
     const rad = (this.options.heading * Math.PI) / 180;
     const sin = Math.sin(rad);
     const cos = Math.cos(rad);
@@ -122,6 +116,32 @@ L.BoatMarker = L.Marker.extend({
       anchor.x + dx * cos - dy * sin,
       anchor.y + dx * sin + dy * cos,
     );
+  },
+
+  // The boat icon's geometric center as a map layer point, accounting for the
+  // current heading. getLatLng() tracks the GPS antenna (the marker's anchor),
+  // which can sit anywhere on the hull; the center is offset from it by half
+  // the icon's size and rotates about the antenna along with the image.
+  getBoatCenter() {
+    if (!this._map || this._wPx === undefined) return null;
+    return this._iconOffsetToLayerPoint(
+      this._wPx / 2 - this._oX,
+      this._hPx / 2 - this._oY,
+    );
+  },
+
+  // The icon's drawn bow (front-center of the rendered image) as a map LatLng at
+  // the current zoom. Same as getBoatCenter but at the leading edge (icon-frame
+  // y = 0) rather than the center. Crucially this reflects the *drawn* icon:
+  // when zoomed out the icon is clamped to a minimum on-screen size (see the
+  // minHeight in _update), so it is not drawn to true scale and its bow can sit
+  // well ahead of a fixed metres-forward offset from the antenna. Anything that
+  // must visually attach to the bow (the course vector) uses this so it starts
+  // at the icon's tip at every zoom, not buried inside an oversized icon.
+  getBoatBow() {
+    if (!this._map || this._wPx === undefined) return null;
+    const bow = this._iconOffsetToLayerPoint(this._wPx / 2 - this._oX, -this._oY);
+    return this._map.layerPointToLatLng(bow);
   },
 
   // Bind the name label, then place it correctly straight away. The marker's
