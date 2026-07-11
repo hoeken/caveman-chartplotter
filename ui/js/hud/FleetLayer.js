@@ -387,7 +387,6 @@ export class FleetLayer {
     this.syncOtherVessels(this.vesselCache, {
       ownLatLng: this.app.state.getPosition(),
       filterRadius: this.filterRadius,
-      twa: this.app.state.twa,
     });
   }
 
@@ -534,7 +533,7 @@ export class FleetLayer {
   }
 
   // Reconcile other-vessel markers and tracks against a fresh /vessels payload.
-  syncOtherVessels(vessels, { ownLatLng, filterRadius, twa }) {
+  syncOtherVessels(vessels, { ownLatLng, filterRadius }) {
     const detected = [];
 
     for (let key in vessels) {
@@ -562,7 +561,7 @@ export class FleetLayer {
       );
 
       detected.push(vessel.mmsi);
-      const heading = this.deriveVesselHeading(vessel, twa);
+      const heading = this.deriveVesselHeading(vessel);
       const distanceRounded = Math.round(dist);
 
       if (vessel.mmsi in this.vessels) {
@@ -590,21 +589,16 @@ export class FleetLayer {
     }
   }
 
-  // Heading preference: true heading > COG (only if moving) > observer's TWA > 0.
-  // COG is wonky at low speed, so we gate it on SOG > 1 knot.
-  deriveVesselHeading(vessel, twa) {
-    const sogVal = SignalKHelper.value(vessel, "navigation.speedOverGround");
-
+  // Heading preference: true heading > COG > 0.
+  deriveVesselHeading(vessel) {
     const headingTrue = SignalKHelper.value(vessel, "navigation.headingTrue");
     if (headingTrue !== undefined)
       return radiansToDegrees(headingTrue);
 
     const cog = SignalKHelper.value(vessel, "navigation.courseOverGroundTrue");
-    if (cog !== undefined && sogVal > 0.5)
+    if (cog !== undefined)
       return radiansToDegrees(cog);
 
-    if (twa)
-      return radiansToDegrees(twa.value);
     return 0;
   }
 

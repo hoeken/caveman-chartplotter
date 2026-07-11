@@ -7,7 +7,6 @@ import { radiansToDegrees } from "@turf/turf";
 const DEFAULT_FRESHNESS_SEC = 300;
 
 const DELTA_FAST_SPEED = 250;
-const DELTA_SLOW_SPEED = 1000;
 
 export class AppState {
   websocketSubscribe(client) {
@@ -30,8 +29,8 @@ export class AppState {
             sendMeta: "all",
           },
           {
-            path: "environment.wind.directionTrue",
-            period: DELTA_SLOW_SPEED,
+            path: "navigation.courseOverGroundTrue",
+            period: DELTA_FAST_SPEED,
             format: "full",
             policy: "fixed",
             sendMeta: "all",
@@ -97,9 +96,9 @@ export class AppState {
 
     this.currentCoordinates = this.extract(data, "navigation.position");
     this.heading = this.extract(data, "navigation.headingTrue") ?? this.heading;
-    // TWA is kept solely as a heading fallback: an anchored or drifting boat
-    // with no heading sensor tends to point into the wind.
-    this.twa = this.extract(data, "environment.wind.directionTrue") ?? this.twa;
+    // COG is kept solely as a heading fallback for boats with no heading sensor.
+    this.cog =
+      this.extract(data, "navigation.courseOverGroundTrue") ?? this.cog;
   }
 
   handleDelta(timestamp, delta) {
@@ -123,8 +122,8 @@ export class AppState {
       this.currentCoordinates = apply(this.currentCoordinates);
     else if (path == "navigation.headingTrue")
       this.heading = apply(this.heading);
-    else if (path == "environment.wind.directionTrue")
-      this.twa = apply(this.twa);
+    else if (path == "navigation.courseOverGroundTrue")
+      this.cog = apply(this.cog);
     // else if (!path.startsWith("notifications"))
     //   console.log(`[websocket] Ignoring: ${path}`);
   }
@@ -136,14 +135,14 @@ export class AppState {
 
   // Heading priority:
   // SignalK headingTrue
-  // last-known TWA
+  // COG
   // 0
   computeOwnHeading() {
     if (this.heading)
       return radiansToDegrees(this.heading.value);
 
-    if (this.twa)
-      return radiansToDegrees(this.twa.value);
+    if (this.cog)
+      return radiansToDegrees(this.cog.value);
 
     return 0;
   }
