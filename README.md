@@ -12,13 +12,21 @@ This is a hard fork of my anchor alarm plugin, [hoekens-anchor-alarm](https://gi
 
 Switch between satellite imagery, OpenStreetMap, or a blank base (for offline use or local-charts-only setups). Local raster charts served by a SignalK charts plugin appear automatically as overlays for the area you're looking at, and the optional [Seascape](https://openwaters.io/) bathymetry overlay shades water depth on capable browsers.
 
-### ⛵ Physically accurate boat icons
+### 🧭 Course vectors
 
-Give it your beam, LOA, and GPS antenna position and the boat icon is drawn to your boat's *true* size, rotating around the antenna location. Icons are picked by AIS ship type, or upload your own custom image from the settings dialog.
+A COG/SOG predictor line extends from each vessel's bow, showing where it'll be after a set amount of travel time (5, 10, 15, 30, or 60 minutes, or off). It applies to your own boat and every AIS neighbor, and stationary vessels get no line — so a moored fleet doesn't sprout flickering vectors. The length is configurable in the settings dialog.
+
+### 📍 Follow mode
+
+Tap the home button and the viewport locks to your boat, staying highlighted green while it tracks; any drag of the map drops you back to free-pan. An optional "look ahead" biases the view toward the water in your direction of travel — scaled by speed and capped so the boat never leaves the screen — so you see more of where you're going instead of where you've been.
 
 ### 🛰️ Tracks & fleet
 
 Historical tracks are color-coded (green for fresh, fading to red as they age) via the [@signalk/tracks-plugin](https://github.com/SignalK/tracks). Other AIS vessels show up too, with their own tracks and accurately-typed icons. Click a vessel for a detailed popup: name, MMSI, length, beam, distance, bearing, SOG, and COG.
+
+### ⛵ Physically accurate boat icons
+
+Give it your beam, LOA, and GPS antenna position and the boat icon is drawn to your boat's *true* size, rotating around the antenna location. Icons are picked by AIS ship type, or upload your own custom image from the settings dialog.
 
 ### 🌓 Day and night themes
 
@@ -26,7 +34,7 @@ A one-tap light/dark toggle, plus automatic handling of the `?mode=night` / `?mo
 
 ### ⚙️ In-map settings
 
-Logged-in users can tweak the UI without leaving for the plugin config page. A gear button opens a settings dialog (basemap, layer toggles, fleet radius, boat icon) and every change applies live.
+Logged-in users can tweak the UI without leaving for the plugin config page. A gear button opens a settings dialog (basemap, layer toggles, fleet radius, boat icon, course vector length, follow-mode look ahead) and every change applies live.
 
 ## Usage
 
