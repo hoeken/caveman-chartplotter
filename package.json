@@ -20,6 +20,7 @@
   "files": [
     "src",
     "public",
+    "docs/screenshots",
     "CHANGELOG.md"
   ],
   "lint-staged": {
