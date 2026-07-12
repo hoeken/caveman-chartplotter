@@ -583,7 +583,10 @@ class ChartPlotter {
     // Buttons - Top Right
     //
     this.homeButton = new HomeButtonControl({
-      onHome: () => this.enterFollowMode(),
+      onHome: () => {
+        this.map?.closePopup();
+        this.enterFollowMode();
+      },
     });
     this.map.addControl(this.homeButton);
 
