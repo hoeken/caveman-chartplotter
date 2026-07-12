@@ -10,10 +10,10 @@
 
 import { destination, radiansToDegrees } from "@turf/turf";
 
-// Below this speed a boat is treated as stationary and gets no vector. ~0.1 kn,
+// Below this speed a boat is treated as stationary and gets no vector. ~0.5 kn,
 // well under GPS position noise, so a moored boat's jitter can't sprout a
 // flickering predictor.
-const MIN_SOG_MPS = 0.05;
+const MIN_SOG_MPS = 0.25;
 
 // Compute the course vector as a [[lat, lng], [lat, lng]] pair (bow → tip), or
 // null when nothing should be drawn: the feature is off (minutes ≤ 0), the boat

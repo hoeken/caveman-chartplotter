@@ -780,15 +780,19 @@ export class FleetLayer {
     this.updateLabelCollisions();
   }
 
-  // Heading preference: true heading > COG > 0.
+  // Orientation preference for other vessels: COG > true heading > 0. AIS
+  // targets' reported heading is often stale, absent, or points off from actual
+  // travel (a Class B unit with no heading sensor may transmit a fixed/default
+  // value), so course over ground — derived from successive fixes — is the more
+  // reliable indicator of which way a vessel is actually moving.
   deriveVesselHeading(vessel) {
-    const headingTrue = SignalKHelper.value(vessel, "navigation.headingTrue");
-    if (headingTrue !== undefined)
-      return radiansToDegrees(headingTrue);
-
     const cog = SignalKHelper.value(vessel, "navigation.courseOverGroundTrue");
     if (cog !== undefined)
       return radiansToDegrees(cog);
+
+    const headingTrue = SignalKHelper.value(vessel, "navigation.headingTrue");
+    if (headingTrue !== undefined)
+      return radiansToDegrees(headingTrue);
 
     return 0;
   }
