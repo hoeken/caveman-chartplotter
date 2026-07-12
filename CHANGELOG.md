@@ -1,3 +1,13 @@
+# v1.1.0
+
+- **Routes on the chart** — read-only routes from the SignalK resources provider (`/signalk/v2/api/resources/routes`) are drawn as a solid green line with a dot at the start, direction triangles along each leg, and a square at the end (rendered with SVG attribute rotation so it works on Chromium 69 MFDs).
+  - Only routes touching the viewport are drawn, recomputed as you pan/zoom, with correct handling of antimeridian-crossing views and routes.
+  - Routes re-poll every 60 seconds, so edits made in other apps appear live.
+  - New **Show Routes** setting (default on) in the plugin schema and the in-map settings dialog.
+  - In-view routes get per-route checkboxes in the layer control, grouped below a divider and sorted alphabetically.
+  - While actively navigating a route (`navigation.course.activeRoute`), only that route is shown.
+- Clicking the home button now closes any open vessel info popup before recentering on your boat.
+
 # v1.0.1
 
 - Include the SignalK screenshots (`docs/screenshots/*.png`) in the published npm tarball — they were referenced by `signalk.screenshots` but excluded by the `files` allowlist.

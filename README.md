@@ -14,6 +14,10 @@ This is a hard fork of my anchor alarm plugin, [hoekens-anchor-alarm](https://gi
 
 Switch between satellite imagery, OpenStreetMap, or a blank base (for offline use or local-charts-only setups). Local raster charts served by a SignalK charts plugin appear automatically as overlays for the area you're looking at, and the optional [Seascape](https://openwaters.io/) bathymetry overlay shades water depth on capable browsers.
 
+### 🛤️ Routes
+
+Routes from your SignalK server's resources API are drawn on the chart — a green line with a dot at the start, arrows pointing the way along each leg, and a square at the end. Only routes near your current view are shown, each one gets its own checkbox in the layer control, and while you're actively navigating a route, it's the only one drawn. Routes refresh every minute, so edits made in Freeboard or any other app show up without a reload. Display is read-only (this is a chart plotter, not a route editor) and can be switched off with the "Show Routes" setting.
+
 ### 🧭 Course vectors
 
 A COG/SOG predictor line extends from each vessel's bow, showing where it'll be after a set amount of travel time (5, 10, 15, 30, or 60 minutes, or off). It applies to your own boat and every AIS neighbor, and stationary vessels get no line — so a moored fleet doesn't sprout flickering vectors. The length is configurable in the settings dialog.
@@ -36,7 +40,7 @@ A one-tap light/dark toggle, plus automatic handling of the `?mode=night` / `?mo
 
 ### ⚙️ In-map settings
 
-Logged-in users can tweak the UI without leaving for the plugin config page. A gear button opens a settings dialog (basemap, layer toggles, fleet radius, boat icon, course vector length, follow-mode look ahead) and every change applies live.
+Logged-in users can tweak the UI without leaving for the plugin config page. A gear button opens a settings dialog (basemap, layer toggles, route display, fleet radius, boat icon, course vector length, follow-mode look ahead) and every change applies live.
 
 ## Usage
 
