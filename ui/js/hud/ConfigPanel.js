@@ -15,6 +15,7 @@ const FIELDS = [
   { key: "enableBoatLabels", label: "Show Boat Name Labels", type: "checkbox" },
   { key: "enableOwnTrack", label: "Show My Boat Track", type: "checkbox" },
   { key: "enableOtherTracks", label: "Show Other Boat Tracks", type: "checkbox" },
+  { key: "enableRoutes", label: "Show Routes", type: "checkbox" },
   { key: "enableChartLayers", label: "Use Chart Layers if Available", type: "checkbox" },
   { key: "enableLookAhead", label: "Look Ahead in Follow Mode", type: "checkbox" },
   // The Seascape depth overlay needs MapLibre/WebGL (see SeascapeLoader), so the

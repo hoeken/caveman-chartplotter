@@ -91,6 +91,7 @@ describe("applyDefaults()", () => {
     assert.equal(config.enableBoatLabels, true);
     assert.equal(config.enableOwnTrack, true);
     assert.equal(config.enableOtherTracks, true);
+    assert.equal(config.enableRoutes, true);
     assert.equal(config.enableChartLayers, true);
     assert.equal(config.enableSeascape, false);
     assert.equal(config.courseVectorMinutes, 15);

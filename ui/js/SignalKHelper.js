@@ -157,6 +157,15 @@ export class SignalKHelper {
     return fetch(`${this.baseUrl}/signalk/v2/api/resources/charts`)
       .then(SignalKHelper._toJsonOrReject);
   }
+  // Fetch the routes collection from the v2 resources API (populated by a
+  // resources provider plugin). Hits the v2 path directly for the same reason
+  // as fetchCharts. Rejects like the other fetchers on HTTP error, including a
+  // 404 when no resources provider is installed — callers treat that as "no
+  // routes available".
+  fetchRoutes() {
+    return fetch(`${this.baseUrl}/signalk/v2/api/resources/routes`)
+      .then(SignalKHelper._toJsonOrReject);
+  }
   fetchConfig() {
     return fetch(`${this.baseUrl}/plugins/${this.pluginName}/ui-config`)
       .then(SignalKHelper._toJsonOrReject);

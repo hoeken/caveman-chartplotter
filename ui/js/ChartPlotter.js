@@ -11,7 +11,9 @@ import { HomeButtonControl } from "./hud/HomeButtonControl.js";
 import { StaleReloader } from "./StaleReloader.js";
 import { loadSeascapeLayer } from "./SeascapeLoader.js";
 import { loadChartLayers, CHART_PANE, CHART_PANE_Z_INDEX } from "./ChartLayers.js";
+import { RoutesLayer } from "./RoutesLayer.js";
 import { ControlToolbar } from "./hud/ControlToolbar.js";
+import { LayersControl } from "./hud/LayersControl.js";
 import { ConfigPanel } from "./hud/ConfigPanel.js";
 import { ThemeControl } from "./hud/ThemeControl.js";
 import { Modal } from "./hud/Modal.js";
@@ -77,6 +79,7 @@ class ChartPlotter {
       enableBoatLabels: true,
       enableOwnTrack: true,
       enableOtherTracks: true,
+      enableRoutes: true,
       enableChartLayers: true,
       enableSeascape: false,
       courseVectorMinutes: 15,
@@ -495,6 +498,7 @@ class ChartPlotter {
     this.fleetLayer?.setShowOwnTrack(this.config.enableOwnTrack);
     this.fleetLayer?.setShowOtherTracks(this.config.enableOtherTracks);
     this.fleetLayer?.setCourseVectorMinutes(this.config.courseVectorMinutes);
+    this.routesLayer?.setShowRoutes(this.config.enableRoutes);
     this.updateMap();
     this.statusBar.clear("config-save");
     return this.signalK.saveConfig(newConfig).catch((error) => {
@@ -568,9 +572,13 @@ class ChartPlotter {
       this.map.addControl(this.configPanel);
     }
 
-    this.layersControl = L.control
-      .layers(this.baseMaps, {}, { position: "topleft" })
-      .addTo(this.map);
+    // LayersControl (not the stock L.control.layers) so the route overlays
+    // stay grouped below a divider, separate from the local charts.
+    this.layersControl = new LayersControl(
+      this.baseMaps,
+      {},
+      { position: "topleft" },
+    ).addTo(this.map);
     this.addSeascapeLayer();
     this.addChartLayers();
 
@@ -613,6 +621,18 @@ class ChartPlotter {
     // the next update tick.
     this.map.on("zoomend", () => this.followTick());
     window.addEventListener("resize", () => this.updateAttribution());
+
+    // Read-only display of the routes served by a resources provider plugin
+    // (see RoutesLayer). It owns its own fetch/poll cycle and moveend-driven
+    // viewport filtering, listing each in-view route in the layer control as
+    // a toggleable overlay. The update tick only feeds it the active route
+    // from the delta stream (see updateMap).
+    this.routesLayer = new RoutesLayer({
+      map: this.map,
+      signalK: this.signalK,
+      layersControl: this.layersControl,
+      show: this.config.enableRoutes,
+    });
 
     this.fleetLayer = new FleetLayer({
       app: this,
@@ -778,6 +798,9 @@ class ChartPlotter {
     this.toolbar.update(this.state);
     this.statusBar.update(this.state);
     this.fleetLayer.update(this.state);
+    // While a route is actively being navigated, only it is drawn (see
+    // RoutesLayer.setActiveRoute — a no-op tick-to-tick until it changes).
+    this.routesLayer?.setActiveRoute(this.state.activeRoute?.value ?? null);
     // Keep the viewport locked to the boat while following (no-op otherwise).
     this.followTick();
   }

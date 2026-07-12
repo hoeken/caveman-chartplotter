@@ -66,6 +66,10 @@
             "type": "boolean",
             "description": "Draw other vessels' historical tracks on the map."
           },
+          "enableRoutes": {
+            "type": "boolean",
+            "description": "Draw routes from the SignalK resources API on the map (read-only). Requires a resources provider plugin serving /resources/routes."
+          },
           "enableChartLayers": {
             "type": "boolean",
             "description": "When local raster charts are available (via a charts plugin), enable them as map overlays by default."

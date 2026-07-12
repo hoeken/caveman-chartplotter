@@ -42,6 +42,15 @@ export class AppState {
             policy: "fixed",
             sendMeta: "all",
           },
+          {
+            // v2 Course API: the route currently being navigated (or null when
+            // course is cleared). Gates which routes RoutesLayer draws.
+            path: "navigation.course.activeRoute",
+            period: DELTA_FAST_SPEED,
+            format: "full",
+            policy: "fixed",
+            sendMeta: "all",
+          },
         ],
       },
     );
@@ -109,6 +118,13 @@ export class AppState {
       this.extract(data, "navigation.courseOverGroundTrue") ?? this.cog;
     this.sog =
       this.extract(data, "navigation.speedOverGround") ?? this.sog;
+    // Not freshness-checked: a route activated hours ago is still the active
+    // route — its validity isn't time-based like a sensor reading's.
+    this.activeRoute = this.extract(
+      data,
+      "navigation.course.activeRoute",
+      false,
+    );
   }
 
   handleDelta(timestamp, delta) {
@@ -136,6 +152,8 @@ export class AppState {
       this.cog = apply(this.cog);
     else if (path == "navigation.speedOverGround")
       this.sog = apply(this.sog);
+    else if (path == "navigation.course.activeRoute")
+      this.activeRoute = apply(this.activeRoute);
     // else if (!path.startsWith("notifications"))
     //   console.log(`[websocket] Ignoring: ${path}`);
   }

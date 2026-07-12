@@ -97,6 +97,13 @@ export function buildSchema(app) {
           "Draw other vessels' historical tracks on the map.",
         default: true,
       },
+      enableRoutes: {
+        type: "boolean",
+        title: "Show Routes",
+        description:
+          "Draw routes from the SignalK resources API on the map (read-only). Requires a resources provider plugin serving /resources/routes.",
+        default: true,
+      },
       enableChartLayers: {
         type: "boolean",
         title: "Use Chart Layers if Available",
@@ -162,6 +169,7 @@ export const UI_CONFIG_KEYS = [
   "enableBoatLabels",
   "enableOwnTrack",
   "enableOtherTracks",
+  "enableRoutes",
   "enableChartLayers",
   "enableSeascape",
   "courseVectorMinutes",
