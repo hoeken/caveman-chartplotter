@@ -1,6 +1,8 @@
 # caveman-chartplotter
 
-A simple, lightweight chart plotter for [SignalK](https://signalk.org/). Caveman make map. Map show boat. Boat good.
+Satellite make map. Map show rocks. Rocks bad.
+
+A simple, lightweight chart plotter for [SignalK](https://signalk.org/).
 
 The whole point is to run *anywhere*: it's built to work on the older embedded browsers found in Navico MFDs (B&G Vulcan/Zeus, Simrad, Lowrance — Chromium 69 era), and it stays light enough for phones, tablets, and cheap boat computers. No frameworks, no build-time magic in the way — just Leaflet, a websocket, and your boat.
 
