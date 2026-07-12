@@ -34,6 +34,11 @@
   "signalk": {
     "appIcon": "logo.png",
     "displayName": "Caveman Chartplotter",
+    "screenshots": [
+      "./docs/screenshots/following.png",
+      "./docs/screenshots/vessel.png",
+      "./docs/screenshots/config.png"
+    ],
     "recommends": [
       "signalk-navico-embedder",
       "@signalk/tracks-plugin"
