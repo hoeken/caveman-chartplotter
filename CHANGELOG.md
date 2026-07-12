@@ -1,3 +1,7 @@
+# v1.0.1
+
+- Include the SignalK screenshots (`docs/screenshots/*.png`) in the published npm tarball — they were referenced by `signalk.screenshots` but excluded by the `files` allowlist.
+
 # v1.0.0
 
 Initial release of **Caveman Chartplotter** — a simple, lightweight chart plotter for SignalK, built to run anywhere, including the older embedded browsers (Chromium 69) found in Navico MFDs.
