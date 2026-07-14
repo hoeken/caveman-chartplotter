@@ -1,3 +1,11 @@
+# v1.2.0
+
+- **Smoother follow mode** — following your boat now reads as a continuous glide rather than a 2 Hz hop.
+  - Each tracking tick eases the recenter with an animated `panTo` (interrupted mid-flight by the next tick) instead of teleporting the view with `setView`. Cursor-anchored zooms still snap instantly so a pan animation doesn't fight the zoom.
+  - The look-ahead bearing is fed through a circular exponential moving average (blending unit vectors so it averages correctly across the 0/2π wrap) with a 10-second time constant, so wave-induced yaw no longer makes the view lurch while a real turn is still tracked within a few seconds.
+- **Follow zoom fits the course vector** — `frameZoom()` picks the highest zoom at which your whole course vector (boat to its predicted position `courseVectorMinutes` ahead) still fits the viewport, so the faster you go the wider you frame. Capped at zoom 18 so a stopped boat frames a harbor, with padding reserved for the look-ahead center bias. Computed only when framing (home button + initial load), so a manual zoom survives while following. The default follow zoom is also widened from 16 to 14 for more surrounding context.
+- **Restyled routes** — routes are now drawn in a dark, muted red (`#8b2222`) instead of bright green, and sunk beneath the overlay pane so your own track and course vector always draw on top. Waypoint shapes sit one pane above the route line so the dot/triangles/square stay on top of it.
+
 # v1.1.0
 
 - **Routes on the chart** — read-only routes from the SignalK resources provider (`/signalk/v2/api/resources/routes`) are drawn as a solid green line with a dot at the start, direction triangles along each leg, and a square at the end (rendered with SVG attribute rotation so it works on Chromium 69 MFDs).
