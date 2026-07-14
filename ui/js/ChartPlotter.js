@@ -23,6 +23,7 @@ import {
   bearingSmoothingAlpha,
 } from "./LookAhead.js";
 import { nativeTooltipsSuppressed, isNavicoMfd } from "./BrowserSupport.js";
+import { courseVectorLatLngs } from "./CourseVector.js";
 
 const UPDATE_INTERVAL_MS = 500;
 // EMA weight for smoothing the look-ahead bearing, derived from the update
@@ -34,9 +35,14 @@ const BEARING_ALPHA = bearingSmoothingAlpha(UPDATE_INTERVAL_MS);
 // 2 Hz hop, and it never decelerates to a stop between ticks.
 const FOLLOW_PAN_DURATION_S = (UPDATE_INTERVAL_MS / 1000) * 1.25;
 const INITIAL_LOAD_RETRY_MS = 5000;
-// Zoom used when framing the boat (initial load and the home button): close
-// enough to read a harbor or anchorage, wide enough for situational awareness.
-const HOME_ZOOM = 14;
+// Framing zoom is derived per-frame to fit our course vector (see frameZoom),
+// but never closer than this — so a boat at rest, with no vector to fit, frames
+// a harbor/anchorage rather than zooming to the map's max. The user calls this
+// the "minimum zoom"; in Leaflet's scale it's the maximum zoom level we'll pick.
+const MAX_FRAME_ZOOM = 18;
+// Breathing room (px) reserved around the course vector when fitting the frame,
+// so the tip isn't jammed against the viewport edge.
+const FRAME_MARGIN_PX = 40;
 
 // Read a boolean-valued query parameter. Returns `fallback` when the param is
 // absent; otherwise a case-insensitive "true" is true and anything else
@@ -294,14 +300,15 @@ class ChartPlotter {
     handler.enable();
   }
 
-  // Enter follow mode: frame the boat at HOME_ZOOM and keep the viewport locked
-  // to it as new positions arrive (see followTick). Used by the home button and
-  // on initial load. Clicking home while already following just re-frames at
-  // HOME_ZOOM. The home button is highlighted (green) to show follow is active.
+  // Enter follow mode: frame the boat at a zoom that fits our course vector (see
+  // frameZoom) and keep the viewport locked to it as new positions arrive (see
+  // followTick). Used by the home button and on initial load. Clicking home while
+  // already following just re-frames. The home button is highlighted (green) to
+  // show follow is active.
   enterFollowMode() {
     this.following = true;
     this.homeButton?.setActive(true);
-    this.recenterOnBoat(HOME_ZOOM, true);
+    this.recenterOnBoat(this.frameZoom(), true);
   }
 
   // Leave follow mode for free drag: the map stays wherever the user puts it.
@@ -344,6 +351,44 @@ class ChartPlotter {
   // lives in followTick.
   recenterOnBoat(zoom, animate) {
     this.map.setView(this.followCenter(zoom), zoom, { animate });
+  }
+
+  // Zoom to frame the follow view: the highest zoom at which our whole course
+  // vector — from the boat to its predicted position courseVectorMinutes ahead —
+  // still fits the viewport, so the more speed we carry the wider we frame.
+  // Capped at MAX_FRAME_ZOOM; a boat at rest (no vector) frames straight at the
+  // cap rather than zooming to the map's max. Called only when framing (home
+  // button + initial load), not per tick, so a manual zoom survives while
+  // following.
+  frameZoom() {
+    const boat = this.state.getPosition();
+    const vector = courseVectorLatLngs({
+      start: boat,
+      cogRad: this.state.cog?.value,
+      sogMps: this.state.sog?.value,
+      minutes: this.config.courseVectorMinutes,
+    });
+    if (!vector)
+      return MAX_FRAME_ZOOM;
+
+    // getBoundsZoom returns the max zoom at which the bounds fit the current view
+    // (clamped to the map's own min/max). With look-ahead on, the center is
+    // biased ahead of the boat by up to MAX_OFFSET_FRACTION of the viewport, which
+    // slides the trailing end (the boat) toward the back edge — so reserve twice
+    // that offset as padding to keep the boat in frame, plus a fixed margin.
+    const size = this.map.getSize();
+    let biasPad = 0;
+    if (this.config.enableLookAhead) {
+      const offset = lookAheadOffsetPixels({
+        cogRad: this.state.cog?.value,
+        sogMps: this.state.sog?.value,
+        viewportMin: Math.min(size.x, size.y),
+      });
+      biasPad = 2 * Math.hypot(offset.x, offset.y);
+    }
+    const pad = biasPad + FRAME_MARGIN_PX;
+    const fit = this.map.getBoundsZoom(L.latLngBounds(vector), false, L.point(pad, pad));
+    return Math.min(MAX_FRAME_ZOOM, fit);
   }
 
   // The map center to follow. Normally the boat itself; with the "look ahead"
