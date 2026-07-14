@@ -36,7 +36,7 @@ const FOLLOW_PAN_DURATION_S = (UPDATE_INTERVAL_MS / 1000) * 1.25;
 const INITIAL_LOAD_RETRY_MS = 5000;
 // Zoom used when framing the boat (initial load and the home button): close
 // enough to read a harbor or anchorage, wide enough for situational awareness.
-const HOME_ZOOM = 16;
+const HOME_ZOOM = 14;
 
 // Read a boolean-valued query parameter. Returns `fallback` when the param is
 // absent; otherwise a case-insensitive "true" is true and anything else
