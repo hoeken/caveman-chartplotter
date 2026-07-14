@@ -40,3 +40,41 @@ export function lookAheadOffsetPixels({ cogRad, sogMps, viewportMin }) {
     y: -distance * Math.cos(cogRad),
   };
 }
+
+// Time constant for smoothing the look-ahead bearing, in milliseconds. In a
+// seaway the boat yaws with each wave, so raw heading/COG jitters and the
+// look-ahead point jumps around; blending toward each new reading over roughly
+// this long steadies it, trading a little more lag on real turns for a much
+// calmer view. See smoothBearingRad / bearingSmoothingAlpha.
+export const BEARING_SMOOTHING_TAU_MS = 10000;
+
+// Convert a smoothing time constant and a fixed sampling interval into the EMA
+// weight (alpha, in (0,1]) applied to the newest sample. Standard first-order
+// low-pass discretization: alpha = dt / (dt + tau). A larger interval or smaller
+// tau means each sample counts for more (less smoothing).
+export function bearingSmoothingAlpha(intervalMs, tauMs = BEARING_SMOOTHING_TAU_MS) {
+  if (!(intervalMs > 0) || !(tauMs > 0))
+    return 1;
+  return intervalMs / (intervalMs + tauMs);
+}
+
+// Exponential moving average for a bearing in radians. Angles wrap at 0/2π, so
+// they can't be averaged arithmetically (359° and 1° must average to 0°, not
+// 180°); we blend the two directions as unit vectors and take the angle of the
+// result. `alpha` in (0,1] weights the new sample — smaller is smoother and
+// laggier. Returns `sample` on the first reading (no prior value) and holds
+// `prev` when the sample is missing. The result is in (−π, π]; that's fine for
+// look-ahead since only its sin/cos are used downstream.
+export function smoothBearingRad(prev, sample, alpha) {
+  if (sample == null)
+    return prev ?? null;
+  if (prev == null)
+    return sample;
+  const x = alpha * Math.sin(sample) + (1 - alpha) * Math.sin(prev);
+  const y = alpha * Math.cos(sample) + (1 - alpha) * Math.cos(prev);
+  // Diametrically opposite bearings cancel to the origin, which has no
+  // direction; keep the prior rather than snapping to an arbitrary angle.
+  if (x === 0 && y === 0)
+    return prev;
+  return Math.atan2(x, y);
+}

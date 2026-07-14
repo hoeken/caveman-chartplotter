@@ -1,6 +1,10 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { lookAheadOffsetPixels } from "../ui/js/LookAhead.js";
+import {
+  lookAheadOffsetPixels,
+  smoothBearingRad,
+  bearingSmoothingAlpha,
+} from "../ui/js/LookAhead.js";
 
 // Base inputs for a boat making 10 m/s (well past the full-offset speed) due
 // north in a 1000px viewport. Individual tests override just what they exercise.
@@ -66,5 +70,54 @@ describe("lookAheadOffsetPixels()", () => {
       const offset = lookAheadOffsetPixels({ ...BASE, viewportMin: 500 });
       near(offset.y, -150); // 500 * 0.3 * 1
     });
+  });
+});
+
+describe("bearingSmoothingAlpha()", () => {
+  test("uses alpha = dt / (dt + tau)", () => {
+    near(bearingSmoothingAlpha(500, 4000), 500 / 4500);
+  });
+
+  test("a larger interval weights each sample more", () => {
+    assert.ok(bearingSmoothingAlpha(1000, 4000) > bearingSmoothingAlpha(500, 4000));
+  });
+
+  test("degenerate inputs fall back to no smoothing (alpha = 1)", () => {
+    assert.equal(bearingSmoothingAlpha(0, 4000), 1);
+    assert.equal(bearingSmoothingAlpha(500, 0), 1);
+  });
+});
+
+describe("smoothBearingRad()", () => {
+  const HALF_ALPHA = 0.5;
+
+  test("seeds directly from the first sample when there's no prior", () => {
+    near(smoothBearingRad(null, 1.2, HALF_ALPHA), 1.2);
+  });
+
+  test("holds the prior when the sample is missing", () => {
+    near(smoothBearingRad(0.7, null, HALF_ALPHA), 0.7);
+  });
+
+  test("returns null when neither prior nor sample is available", () => {
+    assert.equal(smoothBearingRad(null, null, HALF_ALPHA), null);
+  });
+
+  test("blends toward the new sample", () => {
+    // Halfway between due north (0) and due east (π/2) is π/4.
+    near(smoothBearingRad(0, Math.PI / 2, HALF_ALPHA), Math.PI / 4);
+  });
+
+  test("averages across the 0/2π wrap without swinging the long way round", () => {
+    // 350° and 10° should smooth to 0° (north), not 180° (south). Using
+    // symmetric bearings just north of due north on either side.
+    const just_west = -Math.PI / 18; // -10°
+    const just_east = Math.PI / 18; //  +10°
+    near(smoothBearingRad(just_west, just_east, HALF_ALPHA), 0);
+  });
+
+  test("a small alpha barely moves the bearing (heavy smoothing)", () => {
+    const next = smoothBearingRad(0, Math.PI / 2, 0.1);
+    assert.ok(next > 0 && next < Math.PI / 8, `expected a small nudge, got ${next}`);
   });
 });

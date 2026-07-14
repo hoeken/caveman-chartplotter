@@ -17,10 +17,17 @@ import { LayersControl } from "./hud/LayersControl.js";
 import { ConfigPanel } from "./hud/ConfigPanel.js";
 import { ThemeControl } from "./hud/ThemeControl.js";
 import { Modal } from "./hud/Modal.js";
-import { lookAheadOffsetPixels } from "./LookAhead.js";
+import {
+  lookAheadOffsetPixels,
+  smoothBearingRad,
+  bearingSmoothingAlpha,
+} from "./LookAhead.js";
 import { nativeTooltipsSuppressed, isNavicoMfd } from "./BrowserSupport.js";
 
 const UPDATE_INTERVAL_MS = 500;
+// EMA weight for smoothing the look-ahead bearing, derived from the update
+// cadence so the smoothing time constant holds regardless of UPDATE_INTERVAL_MS.
+const BEARING_ALPHA = bearingSmoothingAlpha(UPDATE_INTERVAL_MS);
 const INITIAL_LOAD_RETRY_MS = 5000;
 // Zoom used when framing the boat (initial load and the home button): close
 // enough to read a harbor or anchorage, wide enough for situational awareness.
@@ -116,6 +123,11 @@ class ChartPlotter {
     // delta to either own-boat state or the fleet layer once we subscribe to
     // both vessels.self and vessels.*.
     this.selfContext = null;
+    // Smoothed course used for the look-ahead bias (radians true), advanced once
+    // per update tick from the raw COG/heading. Null until the first reading; a
+    // low-pass filter (see advanceLookAheadBearing) keeps the map from lurching
+    // as the boat yaws in a seaway.
+    this.smoothedCogRad = null;
   }
 
   static startup() {
@@ -323,6 +335,15 @@ class ChartPlotter {
   // of the water ahead is visible while the boat stays comfortably on screen.
   // The pixel offset is pure/testable (see LookAhead.js); here we project the
   // boat to pixels at the target zoom, shift, and unproject back to a lat/lng.
+  // Fold the latest course over ground (falling back to heading) into the
+  // smoothed bearing that drives the look-ahead. Called once per update tick so
+  // the EMA weight (BEARING_ALPHA) matches the tick interval. The first reading
+  // seeds the filter directly so the map doesn't ramp up from due north.
+  advanceLookAheadBearing() {
+    const raw = this.state.cog?.value ?? this.state.heading?.value ?? null;
+    this.smoothedCogRad = smoothBearingRad(this.smoothedCogRad, raw, BEARING_ALPHA);
+  }
+
   followCenter(zoom) {
     const boat = this.state.getPosition();
     if (!this.config.enableLookAhead)
@@ -330,9 +351,9 @@ class ChartPlotter {
 
     const size = this.map.getSize();
     const offset = lookAheadOffsetPixels({
-      // Bias along our course over ground, falling back to heading; both are in
-      // radians true (Signal K base units).
-      cogRad: this.state.cog?.value ?? this.state.heading?.value ?? null,
+      // Bias along the smoothed course (see advanceLookAheadBearing), in radians
+      // true (Signal K base units), so wave-induced yaw doesn't jitter the view.
+      cogRad: this.smoothedCogRad,
       sogMps: this.state.sog?.value ?? null,
       viewportMin: Math.min(size.x, size.y),
     });
@@ -367,6 +388,7 @@ class ChartPlotter {
         this.setupConnection();
         this.buildMap();
 
+        this.advanceLookAheadBearing();
         this.updateMap();
         this.enterFollowMode();
       })
@@ -813,6 +835,7 @@ class ChartPlotter {
   update() {
     try {
       this.state.calculate();
+      this.advanceLookAheadBearing();
       this.updateMap();
       this.statusBar.clear("update");
     } catch (error) {
