@@ -28,6 +28,11 @@ const UPDATE_INTERVAL_MS = 500;
 // EMA weight for smoothing the look-ahead bearing, derived from the update
 // cadence so the smoothing time constant holds regardless of UPDATE_INTERVAL_MS.
 const BEARING_ALPHA = bearingSmoothingAlpha(UPDATE_INTERVAL_MS);
+// Duration of the animated per-tick follow pan, in seconds. Set a touch longer
+// than the update interval so each tick's pan is interrupted mid-flight by the
+// next one — with linear easing that reads as a continuous glide rather than a
+// 2 Hz hop, and it never decelerates to a stop between ticks.
+const FOLLOW_PAN_DURATION_S = (UPDATE_INTERVAL_MS / 1000) * 1.25;
 const INITIAL_LOAD_RETRY_MS = 5000;
 // Zoom used when framing the boat (initial load and the home button): close
 // enough to read a harbor or anchorage, wide enough for situational awareness.
@@ -309,25 +314,36 @@ class ChartPlotter {
   }
 
   // Per-tick recenter while following, at the current zoom so a user's manual
-  // zoom is preserved (zooming doesn't change modes). Called from updateMap.
-  followTick() {
+  // zoom is preserved (zooming doesn't change modes). Called from updateMap with
+  // smooth=true (an eased pan that glides the view along as the boat moves) and
+  // from the zoomend handler with smooth=false (snap the boat back to center
+  // right away, without a competing pan animation on top of the zoom).
+  followTick(smooth = false) {
     if (!this.following || !this.map)
       return;
-    this.recenterOnBoat(this.map.getZoom(), false);
+    const zoom = this.map.getZoom();
+    const target = this.followCenter(zoom);
+    // Skip when we're basically already centered, so a moored boat doesn't fire
+    // a redundant moveend — or kick off a no-op pan animation — every tick.
+    const current = this.map.project(this.map.getCenter(), zoom);
+    if (current.distanceTo(this.map.project(target, zoom)) < 0.5)
+      return;
+    if (smooth)
+      this.map.panTo(target, {
+        animate: true,
+        duration: FOLLOW_PAN_DURATION_S,
+        easeLinearity: 1,
+      });
+    else
+      this.map.setView(target, zoom, { animate: false });
   }
 
-  // Center the map on the follow target (the boat, or a point biased ahead of it
-  // — see followCenter) at the given zoom. Skips the setView when we're already
-  // there so a moored boat doesn't fire a redundant moveend every tick.
+  // One-shot reframe on the follow target (the boat, or a point biased ahead of
+  // it — see followCenter) at the given zoom: the home button and initial load.
+  // Animated since it may also change zoom. The steady per-tick tracking pan
+  // lives in followTick.
   recenterOnBoat(zoom, animate) {
-    const target = this.followCenter(zoom);
-    if (!animate && this.map.getZoom() === zoom) {
-      const current = this.map.project(this.map.getCenter(), zoom);
-      const goal = this.map.project(target, zoom);
-      if (current.distanceTo(goal) < 0.5)
-        return;
-    }
-    this.map.setView(target, zoom, { animate });
+    this.map.setView(this.followCenter(zoom), zoom, { animate });
   }
 
   // The map center to follow. Normally the boat itself; with the "look ahead"
@@ -823,8 +839,9 @@ class ChartPlotter {
     // While a route is actively being navigated, only it is drawn (see
     // RoutesLayer.setActiveRoute — a no-op tick-to-tick until it changes).
     this.routesLayer?.setActiveRoute(this.state.activeRoute?.value ?? null);
-    // Keep the viewport locked to the boat while following (no-op otherwise).
-    this.followTick();
+    // Keep the viewport locked to the boat while following (no-op otherwise),
+    // gliding the view along with an eased pan between ticks.
+    this.followTick(true);
   }
 
   // === Live updates ===============================================================
