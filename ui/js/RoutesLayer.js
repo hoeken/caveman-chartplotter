@@ -18,17 +18,22 @@
 
 import { bearing, point } from "@turf/turf";
 
-// Dedicated pane so a route always draws above the local raster charts
-// (CHART_PANE, 350) and the default overlay pane (400: tracks, course
-// vectors), but below the vessel markers (markerPane, 600) — the boats stay
-// the most prominent thing on the chart. Both the line and the waypoint
-// shapes share it so a route renders as one coherent unit.
+// Dedicated panes so a route always draws above the local raster charts
+// (CHART_PANE, 350) but below the default overlay pane (400: tracks, course
+// vectors) and the vessel markers (markerPane, 600) — our own track and course
+// vector stay the most prominent things on the chart, with routes as context
+// beneath them. The waypoint shapes get their own pane one step above the line
+// so the dot/triangles/square always sit on top of the route line, never
+// buried under it; both panes stay below the overlay pane so the whole route
+// layer remains under the track and course vector.
 export const ROUTE_PANE = "routePane";
-export const ROUTE_PANE_Z_INDEX = 450;
+export const ROUTE_PANE_Z_INDEX = 375;
+export const ROUTE_MARKER_PANE = "routeMarkerPane";
+export const ROUTE_MARKER_PANE_Z_INDEX = 385;
 
 // Per the spec: solid green line, solid green shapes with a 1px white border.
-const ROUTE_COLOR = "green";
-const ROUTE_LINE_WEIGHT = 2;
+const ROUTE_COLOR = "#8b2222";
+const ROUTE_LINE_WEIGHT = 3;
 
 // How often to re-poll the routes collection. It's a small JSON document, so a
 // slow poll keeps externally-edited routes current at negligible cost.
@@ -219,6 +224,8 @@ export class RoutesLayer {
 
     if (!map.getPane(ROUTE_PANE))
       map.createPane(ROUTE_PANE).style.zIndex = ROUTE_PANE_Z_INDEX;
+    if (!map.getPane(ROUTE_MARKER_PANE))
+      map.createPane(ROUTE_MARKER_PANE).style.zIndex = ROUTE_MARKER_PANE_Z_INDEX;
 
     // Which routes touch the view changes with the viewport, not just on data
     // refreshes (moveend also fires after a zoom completes).
@@ -324,7 +331,7 @@ export class RoutesLayer {
     for (const shape of routeShapes(points)) {
       layers.push(
         L.marker([shape.lat, shape.lng], {
-          pane: ROUTE_PANE,
+          pane: ROUTE_MARKER_PANE,
           icon: iconFor(shape),
           interactive: false,
           keyboard: false,
