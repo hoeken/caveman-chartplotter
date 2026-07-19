@@ -42,7 +42,6 @@
     ],
     "recommends": [
       "signalk-navico-embedder",
-      "@signalk/tracks-plugin",
       "signalk-questdb"
     ]
   },
