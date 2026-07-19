@@ -308,20 +308,14 @@ export class FleetLayer {
     this.app.signalK
       .fetchTracks(this.filterRadius)
       .then((tracks) => {
-        this.app.statusBar.clear("tracks-plugin");
         this.loadHistoricalTracks(
           tracks,
           this.app.state.getPosition(),
           this.filterRadius,
         );
       })
-      .catch((err) => {
-        const detail = err.statusText || err.message || "unknown error";
-        this.app.statusBar.set(
-          "tracks-plugin",
-          `Tracks plugin not available: ${detail}`,
-          "warning",
-        );
+      .catch(() => {
+        // No tracks plugin (or it errored) — just skip historical tracks.
       });
   }
 
