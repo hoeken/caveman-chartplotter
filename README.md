@@ -28,7 +28,7 @@ Tap the home button and the viewport locks to your boat, staying highlighted gre
 
 ### 🛰️ Tracks & fleet
 
-Historical tracks are color-coded (green for fresh, fading to red as they age) via the [@signalk/tracks-plugin](https://github.com/SignalK/tracks). Other AIS vessels show up too, with their own tracks and accurately-typed icons. Click a vessel for a detailed popup: name, MMSI, length, beam, distance, bearing, SOG, and COG.
+Historical tracks are color-coded (green for fresh, fading to red as they age) via the [@signalk/tracks-plugin](https://github.com/SignalK/tracks). With a v2 History API provider installed (e.g. [signalk-questdb](https://github.com/dirkwa/signalk-questdb)), your own track is rebuilt from the server's recorded position history instead, so it survives server restarts. Other AIS vessels show up too, with their own tracks and accurately-typed icons. Click a vessel for a detailed popup: name, MMSI, length, beam, distance, bearing, SOG, and COG.
 
 ### ⛵ Physically accurate boat icons
 
@@ -76,7 +76,8 @@ Values are compared case-insensitively; anything other than `true` is treated as
 
 This app pairs well with some other software:
 
-- **[@signalk/tracks-plugin](https://github.com/SignalK/tracks)**: required for the historical tracks. I recommend a resolution of 1000ms and 86400 points, which gives you high-resolution data for the last 24 hours. If you've got the memory, you might as well use it.
+- **[signalk-questdb](https://github.com/dirkwa/signalk-questdb)** (or any v2 History API provider): makes your own track survive server restarts, rebuilt from the last 24 hours of recorded position history.
+- **[@signalk/tracks-plugin](https://github.com/SignalK/tracks)**: required for other vessels' historical tracks (and your own, without a history provider). I recommend a resolution of 1000ms and 86400 points, which gives you high-resolution data for the last 24 hours. If you've got the memory, you might as well use it.
 - **[signalk-navico-embedder](https://github.com/SignalK/signalk-navico-embedder)**: puts the chartplotter on your Navico MFD as a native-feeling page.
 - **[hoekens-anchor-alarm](https://github.com/hoeken/hoekens-anchor-alarm)**: this plugin's sibling — the full-featured anchor alarm this chartplotter was forked from.
 - **[Tailscale](https://tailscale.com/)**: makes accessing SignalK remotely dead simple. Free, and a five-minute setup.

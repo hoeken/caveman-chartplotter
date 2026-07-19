@@ -44,6 +44,12 @@ const DEFAULT_FILTER_RADIUS = 500;
 // choice is stable frame-to-frame (no flicker). This gap (in CSS px) is added
 // around each label's box so kept labels never quite touch.
 const LABEL_COLLISION_PADDING = 3;
+// How much own-track history to reconstruct from the v2 History API, and how
+// coarsely to sample it server-side. 24 hours matches the tracks plugin's
+// recommended retention; 10-second buckets keep a full day's response to
+// ~8640 points, under SIMPLIFY_THRESHOLD_SELF so the bulk load isn't drawn raw.
+const OWN_TRACK_HISTORY_HOURS = 24;
+const OWN_TRACK_HISTORY_RESOLUTION_SEC = 10;
 const SIMPLIFY_TOLERANCE_SELF = 0.000002;
 const SIMPLIFY_TOLERANCE_OTHERS = 0.00001;
 const SIMPLIFY_THRESHOLD_SELF = 10000;
@@ -121,6 +127,9 @@ export class FleetLayer {
     this.vesselTracks = {}; // mmsi -> L.hotline
     this.vesselVectors = {}; // mmsi -> L.layerGroup (COG/SOG course vector: halo + line)
     this.trackPointCounts = {}; // mmsi -> current point count in the hotline
+    // Set once the own track has been rebuilt from the History API; from then
+    // on the shorter /tracks own-track buffer must not clobber it.
+    this.ownTrackSeeded = false;
     this.ownVessel = undefined;
     this.ownAntenna = undefined;
     this.ownVector = undefined; // our own boat's course vector, or undefined
@@ -290,6 +299,7 @@ export class FleetLayer {
     // fetch has succeeded — the heavy /tracks request must not compete with
     // the initial load (see ChartPlotter.loadInitialData).
     this.fetchAndLoadTracks();
+    this.seedOwnTrackFromHistory();
 
     // The vessel cache seeds via seedFleet — from the initial-load /vessels
     // snapshot right after construction, and again on every websocket
@@ -664,6 +674,12 @@ export class FleetLayer {
       const mmsi = match[1];
       const data = tracks[uri];
 
+      // A history-seeded own track (see seedOwnTrack) is a superset of the
+      // tracks plugin's in-memory buffer — don't let the shorter one clobber
+      // it. Live appends extend the seeded track either way.
+      if (this.isOwnTrack(mmsi) && this.ownTrackSeeded)
+        continue;
+
       const history = data.coordinates?.[0];
       if (!history || !history.length)
         continue;
@@ -694,6 +710,49 @@ export class FleetLayer {
       this.vesselTracks[mmsi] = this.createTrack(points, points.length, mmsi);
       this.trackPointCounts[mmsi] = this.vesselTracks[mmsi].getLatLngs().length;
     }
+  }
+
+  // Rebuild the own-boat track from the server's v2 History API (served by a
+  // history provider plugin, e.g. signalk-questdb), which survives server
+  // restarts — unlike the in-memory buffer the tracks plugin serves /tracks
+  // from. Failures are silent and non-fatal: without a history provider the
+  // endpoint 404s and whatever the /tracks load produced keeps being used.
+  seedOwnTrackFromHistory() {
+    const to = new Date();
+    const from = new Date(to.getTime() - OWN_TRACK_HISTORY_HOURS * 60 * 60 * 1000);
+    this.app.signalK
+      .fetchPositionHistory(
+        from.toISOString(),
+        to.toISOString(),
+        OWN_TRACK_HISTORY_RESOLUTION_SEC,
+      )
+      .then((response) => {
+        const positions = SignalKHelper.positionsFromHistory(response);
+        if (positions.length)
+          this.seedOwnTrack(positions);
+      })
+      .catch(() => {
+        // No history provider (or it errored) — the /tracks own track stands.
+      });
+  }
+
+  // Replace (or create) the own-boat track from positions fetched off the
+  // History API. Positions are [{latitude, longitude}] oldest first. No
+  // radius filter: unlike the bulk /tracks load this is our own wake, and a
+  // day of passage-making legitimately spans far beyond the fleet radius.
+  // Live deltas keep extending the seeded track through addPointToTrack.
+  seedOwnTrack(positions) {
+    if (!positions.length)
+      return;
+    const points = positions.map((p, i) => [p.latitude, p.longitude, i]);
+
+    const mmsi = String(this.ownMmsi);
+    if (this.vesselTracks[mmsi])
+      this.map.removeLayer(this.vesselTracks[mmsi]);
+    this.vesselTracks[mmsi] = this.createTrack(points, points.length, mmsi);
+    this.trackPointCounts[mmsi] = this.vesselTracks[mmsi].getLatLngs().length;
+    this.ownTrackSeeded = true;
+    console.log(`Own track loaded from history: ${points.length} points`);
   }
 
   // Single entry point for extending any vessel track. Handles dedupe,
