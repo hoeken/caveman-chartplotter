@@ -1,3 +1,11 @@
+# v1.3.0
+
+- **Own track survives server restarts** — when a v2 History API provider (e.g. [signalk-questdb](https://github.com/dirkwa/signalk-questdb)) is installed, the UI rebuilds your own track at startup from the last 24 hours of `navigation.position` at 10-second resolution, so a server restart no longer wipes it. Once seeded from history, the shorter `/tracks` payload no longer clobbers it, and live deltas keep extending it as before. Without a history provider everything behaves exactly as it did. `signalk-questdb` is now the recommended track source, replacing `@signalk/tracks-plugin` in the recommended plugins.
+- **Leaner initial load** — page load now makes one `/ui-config` request (which serves `selfId` and the plugin version) plus a single bulk `/vessels` fetch that seeds both your own boat's state and the fleet cache, instead of fetching the large own-vessel tree twice across `/vessels/self` and `/vessels`. Config loads first, so the first render already uses your configured settings. Anonymous sessions, which can't read `ui-config`, learn the vessel identity from the tiny public `/self` endpoint instead.
+- **Fixes**
+  - Stopped sending per-vessel unsubscribe frames when an AIS vessel ages out of the fleet — SignalK only accepts the global unsubscribe form and logged an error for each one, spamming the server log.
+  - Historical tracks are now silently skipped when the tracks plugin isn't installed, instead of surfacing errors for an optional feature.
+
 # v1.2.0
 
 - **Smoother follow mode** — following your boat now reads as a continuous glide rather than a 2 Hz hop.
