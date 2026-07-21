@@ -1,3 +1,13 @@
+# v1.4.0
+
+A round of startup work aimed at lightweight hardware — a Raspberry Pi running the single-threaded Signal K server — where the webapp's request fan-out at load contended with itself and bogged everything down (ported from hoekens-anchor-alarm v2.10.2):
+
+- **The UI ships as a single inlined file** — the app's JS and CSS plus the vendored Leaflet scripts and stylesheet are now minified and inlined into one `index.html` at build time, collapsing the asset fan-out into a single request. The app source map stays external so live debugging still works, but it's only fetched when devtools is open.
+- **Live data no longer waits on the REST startup chain** — the websocket now opens in parallel with the ui-config → self → vessels sequence instead of after it, so position, heading, and COG/SOG deltas start flowing immediately (previously they stalled for seconds on a crowded anchorage, or indefinitely if the `/vessels` fetch timed out and the load looped). Since the snapshot can now arrive after deltas are flowing, it merges per path and a stale snapshot value can never overwrite fresher stream data.
+- **Heavy reads only happen when their feature is on** — the chart catalog fetch, the bulk fleet-tracks fetch, the History API own-track rebuild, and the ~1 MB MapLibre stack for the Seascape overlay are each skipped unless the corresponding setting is enabled, and load lazily on first enable from the settings dialog. Side effect: the "Use Seascape Bathymetry" checkbox is now always visible since it gates the download, though enabling it remains a no-op on unsupported engines.
+- **The heavy reads that do run take turns** — the chart catalog, routes, fleet tracks, and position history fetches now go through a queue one at a time instead of hammering the server simultaneously; each request's timeout only starts once it actually runs, so queue time never counts against its deadline.
+- **Common icons are preloaded** — the ship and layer-control icons the map needs first are requested ahead of the rest of the page.
+
 # v1.3.0
 
 - **Own track survives server restarts** — when a v2 History API provider (e.g. [signalk-questdb](https://github.com/dirkwa/signalk-questdb)) is installed, the UI rebuilds your own track at startup from the last 24 hours of `navigation.position` at 10-second resolution, so a server restart no longer wipes it. Once seeded from history, the shorter `/tracks` payload no longer clobbers it, and live deltas keep extending it as before. Without a history provider everything behaves exactly as it did. `signalk-questdb` is now the recommended track source, replacing `@signalk/tracks-plugin` in the recommended plugins.

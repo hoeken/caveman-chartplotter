@@ -1,6 +1,6 @@
 {
   "name": "caveman-chartplotter",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Ooga booga! Me want simple chart plotter show custom charts on B&G.",
   "main": "src/index.js",
   "type": "module",
