@@ -86,11 +86,16 @@ export class AppState {
       return L.latLng(0, 0);
   }
 
-  extract(tree, path, fresh = true, maxAge = DEFAULT_FRESHNESS_SEC) {
+  // Pull one path's envelope out of a snapshot tree, merged against the
+  // envelope we already hold. The websocket opens before the /vessels
+  // snapshot resolves, so deltas may already carry a fresher value than the
+  // snapshot — the newer envelope wins (see _newest), and a missing or stale
+  // snapshot value keeps the current one.
+  extract(tree, path, current, fresh = true, maxAge = DEFAULT_FRESHNESS_SEC) {
     let data = SignalKHelper.extract(tree, path);
 
     if (!data)
-      return null;
+      return current ?? null;
 
     // check for freshness.
     if (fresh && !SignalKHelper.isFresh(data, maxAge)) {
@@ -101,28 +106,41 @@ export class AppState {
       SignalKHelper.errorHandler?.(msg);
       console.warn(msg);
       console.trace();
-      return null;
+      return current ?? null;
     }
 
-    return data;
+    return this._newest(data, current);
+  }
+
+  // Keep whichever envelope is newer so the snapshot can't roll a live value
+  // backwards. When the delta envelope wins but arrived without meta, graft
+  // the snapshot's meta on so displayUnits still land.
+  _newest(extracted, current) {
+    if (!current?.timestamp || !extracted.timestamp)
+      return extracted;
+    if (Date.parse(extracted.timestamp) >= Date.parse(current.timestamp))
+      return extracted;
+    if (extracted.meta && !current.meta)
+      current.meta = extracted.meta;
+    return current;
   }
 
   extractAll(data) {
     this.boatConfig = BoatConfig.extract(data);
 
-    this.currentCoordinates = this.extract(data, "navigation.position");
-    this.heading = this.extract(data, "navigation.headingTrue") ?? this.heading;
+    this.currentCoordinates =
+      this.extract(data, "navigation.position", this.currentCoordinates);
+    this.heading = this.extract(data, "navigation.headingTrue", this.heading);
     // COG is kept as a heading fallback for boats with no heading sensor, and,
     // with SOG below, drives our own course vector (see FleetLayer).
-    this.cog =
-      this.extract(data, "navigation.courseOverGroundTrue") ?? this.cog;
-    this.sog =
-      this.extract(data, "navigation.speedOverGround") ?? this.sog;
+    this.cog = this.extract(data, "navigation.courseOverGroundTrue", this.cog);
+    this.sog = this.extract(data, "navigation.speedOverGround", this.sog);
     // Not freshness-checked: a route activated hours ago is still the active
     // route — its validity isn't time-based like a sensor reading's.
     this.activeRoute = this.extract(
       data,
       "navigation.course.activeRoute",
+      this.activeRoute,
       false,
     );
   }
