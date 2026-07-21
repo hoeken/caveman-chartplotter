@@ -14,6 +14,31 @@ export class SignalKHelper {
     // expired session). The app sets this to open the login modal; when unset
     // we fall back to redirecting to the SignalK admin login.
     this.onUnauthorized = null;
+    // Tail of the heavy-read serialization chain (see _enqueueHeavy). Starts
+    // resolved so the first heavy request runs immediately.
+    this._heavyTail = Promise.resolve();
+  }
+
+  // Serialize the heavy REST reads — the local chart catalog, routes, fleet
+  // tracks, and position history — so they run one at a time instead of
+  // hammering the server all at once at startup. On lightweight hardware (a
+  // Raspberry Pi's single-threaded SignalK process plus a disk-backed history
+  // provider) several concurrent heavy queries contend and all slow down;
+  // served back-to-back each stays fast. The queue is strict FIFO with a
+  // concurrency of one, so requests execute in the order callers enqueue them.
+  //
+  // `fn` (which performs the actual fetch, and arms any request timeout it
+  // sets) is invoked only when its turn comes up, so time spent waiting in the
+  // queue never counts against a request's own deadline. A failed request
+  // rejects its own caller but does not stall the queue: the tail advances on
+  // settle regardless of outcome.
+  _enqueueHeavy(fn) {
+    const result = this._heavyTail.then(fn, fn);
+    this._heavyTail = result.then(
+      () => {},
+      () => {},
+    );
+    return result;
   }
 
   // Authenticate against SignalK's REST endpoint. On success the server sets
@@ -151,7 +176,7 @@ export class SignalKHelper {
     return this.request(`vessels/${id}`);
   }
   fetchTracks(radius) {
-    return this.request(`tracks?radius=${radius}`);
+    return this._enqueueHeavy(() => this.request(`tracks?radius=${radius}`));
   }
   // Fetch own-vessel position history from the server's v2 History API,
   // served by a history provider plugin (e.g. signalk-questdb). `from`/`to`
@@ -170,14 +195,19 @@ export class SignalKHelper {
     });
     if (resolution)
       params.set("resolution", String(resolution));
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort("Request timed out"), 15000);
-    return fetch(
-      `${this.baseUrl}/signalk/v2/api/history/values?${params.toString()}`,
-      { signal: controller.signal },
-    )
-      .finally(() => clearTimeout(timer))
-      .then(SignalKHelper._toJsonOrReject);
+    // The AbortController/timer are created inside the queued callback so the
+    // 15s deadline only starts once this request actually runs, not while it
+    // waits behind other heavy reads in the queue.
+    return this._enqueueHeavy(() => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort("Request timed out"), 15000);
+      return fetch(
+        `${this.baseUrl}/signalk/v2/api/history/values?${params.toString()}`,
+        { signal: controller.signal },
+      )
+        .finally(() => clearTimeout(timer))
+        .then(SignalKHelper._toJsonOrReject);
+    });
   }
   // Flatten a v2 History API values response (columns per requested path)
   // into [{time, latitude, longitude}] for the navigation.position column,
@@ -212,8 +242,10 @@ export class SignalKHelper {
   // other fetchers on HTTP error, including a 404 when no charts plugin is
   // installed — callers treat that as "no local charts available".
   fetchCharts() {
-    return fetch(`${this.baseUrl}/signalk/v2/api/resources/charts`)
-      .then(SignalKHelper._toJsonOrReject);
+    return this._enqueueHeavy(() =>
+      fetch(`${this.baseUrl}/signalk/v2/api/resources/charts`)
+        .then(SignalKHelper._toJsonOrReject),
+    );
   }
   // Fetch the routes collection from the v2 resources API (populated by a
   // resources provider plugin). Hits the v2 path directly for the same reason
@@ -221,8 +253,10 @@ export class SignalKHelper {
   // 404 when no resources provider is installed — callers treat that as "no
   // routes available".
   fetchRoutes() {
-    return fetch(`${this.baseUrl}/signalk/v2/api/resources/routes`)
-      .then(SignalKHelper._toJsonOrReject);
+    return this._enqueueHeavy(() =>
+      fetch(`${this.baseUrl}/signalk/v2/api/resources/routes`)
+        .then(SignalKHelper._toJsonOrReject),
+    );
   }
   fetchConfig() {
     return fetch(`${this.baseUrl}/plugins/${this.pluginName}/ui-config`)
