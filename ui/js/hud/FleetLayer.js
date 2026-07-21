@@ -244,12 +244,11 @@ export class FleetLayer {
       return;
     this.showOwnTrack = next;
     this.applyTrackVisibility();
-    // If startup skipped the heavy loads (toggles were off), the first enable
-    // triggers them now.
+    // If startup skipped the bulk history load (both toggles were off), the
+    // first enable triggers it now; the History API fallback rides on it
+    // (see fetchAndLoadTracks).
     if (next && !this.tracksLoadStarted)
       this.fetchAndLoadTracks();
-    if (next && !this.historySeedStarted)
-      this.seedOwnTrackFromHistory();
   }
 
   // Flip other-vessel track visibility live (from the settings dialog).
@@ -307,7 +306,6 @@ export class FleetLayer {
     // fetch has succeeded — the heavy /tracks request must not compete with
     // the initial load (see ChartPlotter.loadInitialData).
     this.fetchAndLoadTracks();
-    this.seedOwnTrackFromHistory();
 
     // The vessel cache seeds via seedFleet — from the initial-load /vessels
     // snapshot right after construction, and again on every websocket
@@ -323,7 +321,9 @@ export class FleetLayer {
   // out of loadInitialData so setFilterRadius can re-run it on a radius change
   // without re-arming the fleet timer. The /tracks read is heavy, so it's
   // skipped entirely while both track toggles are off; the first toggle-on
-  // fetches it lazily (see setShowOwnTrack/setShowOtherTracks).
+  // fetches it lazily (see setShowOwnTrack/setShowOtherTracks). When the
+  // tracks plugin can't supply the own-boat track, the History API rebuilds
+  // it instead (see rehydrateOwnTrackFallback).
   fetchAndLoadTracks() {
     if (!this.showOwnTrack && !this.showOtherTracks)
       return;
@@ -336,10 +336,34 @@ export class FleetLayer {
           this.app.state.getPosition(),
           this.filterRadius,
         );
+        if (!this.hasOwnTrack(tracks))
+          this.rehydrateOwnTrackFallback();
       })
       .catch(() => {
-        // No tracks plugin (or it errored) — just skip historical tracks.
+        // No tracks plugin (or it errored) — skip historical tracks and let
+        // the History API try to rebuild our own.
+        this.rehydrateOwnTrackFallback();
       });
+  }
+
+  // Whether a /tracks payload carries any points for our own boat.
+  hasOwnTrack(tracks) {
+    for (const uri in tracks) {
+      const match = uri.match(/urn:mrn:imo:mmsi:(\d+)$/);
+      if (match && this.isOwnTrack(match[1]))
+        return (tracks[uri].coordinates?.[0]?.length ?? 0) > 0;
+    }
+    return false;
+  }
+
+  // The tracks plugin is the preferred (cheap, in-memory) source for the
+  // own-boat track; when it fails or comes back without one — plugin missing,
+  // errored, or its buffer lost to a server restart — fall back to rebuilding
+  // the last 24 hours from the (heavier) History API.
+  rehydrateOwnTrackFallback() {
+    if (!this.showOwnTrack || this.ownTrackSeeded)
+      return;
+    this.seedOwnTrackFromHistory();
   }
 
   // Apply a new fleet filter radius live (from the settings dialog). Re-fetch
@@ -728,14 +752,11 @@ export class FleetLayer {
   // Rebuild the own-boat track from the server's v2 History API (served by a
   // history provider plugin, e.g. signalk-questdb), which survives server
   // restarts — unlike the in-memory buffer the tracks plugin serves /tracks
-  // from. Failures are silent and non-fatal: without a history provider the
-  // endpoint 404s and whatever the /tracks load produced keeps being used.
-  // The history query is heavy, so it's skipped while the own-track toggle is
-  // off; the first toggle-on runs it lazily (see setShowOwnTrack).
+  // from. Invoked only through rehydrateOwnTrackFallback, so it never runs
+  // while the tracks plugin already supplied an own track. Failures are
+  // silent and non-fatal: without a history provider the endpoint 404s and
+  // whatever the /tracks load produced keeps being used.
   seedOwnTrackFromHistory() {
-    if (!this.showOwnTrack)
-      return;
-    this.historySeedStarted = true;
     const to = new Date();
     const from = new Date(to.getTime() - OWN_TRACK_HISTORY_HOURS * 60 * 60 * 1000);
     this.app.signalK
