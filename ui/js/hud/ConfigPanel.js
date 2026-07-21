@@ -8,7 +8,7 @@
 // Form layout. Order is display order. Every setting here applies live — the
 // host's onChange pushes each change into the running UI, so none of them
 // require a page reload.
-import { setTitle, supportsMaplibre } from "../BrowserSupport.js";
+import { setTitle } from "../BrowserSupport.js";
 import { Modal } from "./Modal.js";
 
 const FIELDS = [
@@ -18,19 +18,19 @@ const FIELDS = [
   { key: "enableRoutes", label: "Show Routes", type: "checkbox" },
   { key: "enableChartLayers", label: "Use Chart Layers if Available", type: "checkbox" },
   { key: "enableLookAhead", label: "Look Ahead in Follow Mode", type: "checkbox" },
-  // The Seascape depth overlay needs MapLibre/WebGL (see SeascapeLoader), so the
-  // toggle is only offered where it can render; on the Chromium 69 MFDs it's
-  // hidden rather than left as a dead switch.
-  ...(supportsMaplibre()
-    ? [{ key: "enableSeascape", label: "Use Seascape Bathymetry", type: "checkbox" }]
-    : []),
+  // Always offered: the toggle gates whether the ~1 MB MapLibre stack behind
+  // the Seascape depth overlay is fetched at all (see
+  // ChartPlotter.addSeascapeLayer), so it must be reachable even before the
+  // layer exists. On engines without WebGL2 (the Chromium 69 MFDs) enabling it
+  // is a no-op — loadSeascapeLayer resolves null and no overlay appears.
+  { key: "enableSeascape", label: "Use Seascape Bathymetry", type: "checkbox" },
   {
     key: "defaultBasemap",
     label: "Default Basemap",
     type: "select",
-    // Seascape is not a base map — it's a depth overlay that always appears in
-    // the layer control when available; the "Use Seascape Bathymetry" setting
-    // above only sets whether it starts on (see ChartPlotter.addSeascapeLayer).
+    // Seascape is not a base map — it's a depth overlay; the "Use Seascape
+    // Bathymetry" setting above gates whether it's loaded and shown at all
+    // (see ChartPlotter.addSeascapeLayer).
     options: [
       // No-tiles base for offline/slow links or crews using only their own
       // local charts (see ChartPlotter.blankLayer).

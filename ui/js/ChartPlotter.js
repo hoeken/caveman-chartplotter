@@ -125,8 +125,9 @@ class ChartPlotter {
     this.configPanel = undefined;
     this.themeControl = undefined;
     this.toolbar = undefined;
-    // Startup snapshot of the local raster charts (see addChartLayers). Every
-    // later add/remove works off this copy so we never re-fetch the catalog.
+    // One-time snapshot of the local raster charts, fetched when the feature
+    // is first enabled (see addChartLayers). Every later add/remove works off
+    // this copy so we never re-fetch the catalog.
     this.chartLayers = [];
     this.updateTimer = null;
     this._loginModal = null;
@@ -631,6 +632,7 @@ class ChartPlotter {
     Object.assign(this.config, newConfig);
     this.setBasemap(this.config.defaultBasemap);
     this.setSeascapeEnabled(this.config.enableSeascape);
+    this.setChartLayersEnabled(this.config.enableChartLayers);
     this.fleetLayer?.setFilterRadius(this.config.fleetFilterRadius);
     this.fleetLayer?.setShowLabels(this.config.enableBoatLabels);
     this.fleetLayer?.setShowOwnTrack(this.config.enableOwnTrack);
@@ -719,8 +721,17 @@ class ChartPlotter {
       {},
       { position: "topleft" },
     ).addTo(this.map);
-    this.addSeascapeLayer();
-    this.addChartLayers();
+    // Seascape only when asked for: the MapLibre stack behind it is ~1 MB off
+    // this same single-threaded server, so it must stay out of the startup
+    // request burst unless the user enabled it (see addSeascapeLayer).
+    if (this.config.enableSeascape)
+      this.addSeascapeLayer();
+    // Local charts only when asked for, too: the catalog fetch — and the chart
+    // tiles the listed layers then pull off this same server — stays out of
+    // startup unless the feature is on (see setChartLayersEnabled for the
+    // lazy load on a later enable).
+    if (this.config.enableChartLayers)
+      this.addChartLayers();
 
     // Light/dark toggle. Unlike the settings gear it isn't login-gated — the
     // theme is a session-only preference anyone can flip (see hud/ThemeControl).
@@ -788,12 +799,20 @@ class ChartPlotter {
 
   // Seascape is a WebGL bathymetry chart (see SeascapeLoader) that shades the
   // water by depth and is transparent over land, so it belongs on top of a base
-  // map as an overlay rather than replacing one. It loads asynchronously (or
-  // never, on the Chromium 69 MFDs) and joins the layer control as a toggleable
-  // overlay once ready, switched on at startup when config.enableSeascape. If it
-  // can't load — offline or an unsupported engine — the selected base map simply
+  // map as an overlay rather than replacing one. Nothing is fetched until
+  // config.enableSeascape asks for it — at startup (see buildMap) or on the
+  // first enable from the settings dialog (see setSeascapeEnabled) — because
+  // the MapLibre stack is ~1 MB served off this same single-threaded server.
+  // Once loaded it joins the layer control as a toggleable overlay, switched on
+  // if config.enableSeascape still holds when the load resolves. If it can't
+  // load — offline or an unsupported engine — the selected base map simply
   // stays visible, so there's no fallback to handle.
   addSeascapeLayer() {
+    // loadSeascapeLayer memoizes the script load, but the control/listener
+    // wiring below must not run twice — guard against repeated enables.
+    if (this.seascapeLoadStarted)
+      return;
+    this.seascapeLoadStarted = true;
     loadSeascapeLayer().then((layer) => {
       if (!layer || !this.map)
         return;
@@ -812,10 +831,14 @@ class ChartPlotter {
     });
   }
 
-  // Match the Seascape overlay to config.enableSeascape once it has loaded. A
-  // no-op before the async load resolves or on engines where it never does —
-  // addSeascapeLayer re-reads the flag when the layer finally arrives.
+  // Match the Seascape overlay to config.enableSeascape. The first enable is
+  // what kicks off the MapLibre load; addSeascapeLayer re-reads the flag when
+  // the layer arrives, so toggles that land mid-load still settle correctly.
   setSeascapeEnabled(enabled) {
+    if (enabled && !this.seascapeLayer) {
+      this.addSeascapeLayer();
+      return;
+    }
     const layer = this.seascapeLayer;
     if (!layer || !this.map)
       return;
@@ -826,13 +849,17 @@ class ChartPlotter {
   }
 
   // Local raster charts served by SignalK's resources API (see ChartLayers) are
-  // fetched once on startup and cached in this.chartLayers, keyed with the
-  // coverage bounds and native min-zoom read back off each Leaflet layer. Every
-  // later chart operation works off that snapshot instead of re-fetching. A
-  // missing charts plugin or a fetch error resolves to an empty list, making
-  // this a no-op then. updateChartLayers() populates the layer control for the
-  // current view.
+  // fetched once — at startup when the feature is on, else on its first
+  // enable — and cached in this.chartLayers, keyed with the coverage bounds
+  // and native min-zoom read back off each Leaflet layer. Every later chart
+  // operation works off that snapshot instead of re-fetching. A missing charts
+  // plugin or a fetch error resolves to an empty list, making this a no-op
+  // then. updateChartLayers() populates the layer control for the current view.
   addChartLayers() {
+    // Guard against repeated enables re-fetching the catalog.
+    if (this.chartLoadStarted)
+      return;
+    this.chartLoadStarted = true;
     loadChartLayers(this.signalK).then((charts) => {
       if (!this.map || !this.layersControl)
         return;
@@ -850,14 +877,18 @@ class ChartPlotter {
   }
 
   // Re-derive which cached local charts belong in the layer control for the
-  // current view. A chart is listed (and, when the "Use Chart Layers" option is
-  // on, enabled by default) only while the map is zoomed in far enough to render
-  // its tiles — below a chart's native minzoom Leaflet draws nothing — and its
-  // coverage overlaps the visible area. Charts with no bounds/zoom metadata are
-  // treated as global and always shown. Panning or zooming a chart out of view
-  // removes it from both the map and the control; bringing it back re-adds it.
+  // current view. A chart is listed (and enabled by default) only while the
+  // map is zoomed in far enough to render its tiles — below a chart's native
+  // minzoom Leaflet draws nothing — and its coverage overlaps the visible
+  // area. Charts with no bounds/zoom metadata are treated as global and always
+  // shown. Panning or zooming a chart out of view removes it from both the map
+  // and the control; bringing it back re-adds it.
   updateChartLayers() {
     if (!this.map || !this.layersControl || !this.chartLayers.length)
+      return;
+    // Feature off: list nothing. A mid-session disable already delisted every
+    // chart (see setChartLayersEnabled); this keeps moveend from re-listing.
+    if (!this.config.enableChartLayers)
       return;
     const zoom = this.map.getZoom();
     const view = this.map.getBounds();
@@ -871,10 +902,7 @@ class ChartPlotter {
       if (show) {
         // Add to the map before the control so the control renders the
         // overlay's checkbox already ticked (it reads map.hasLayer at build).
-        // With the option off, list it in the control but leave it off the map
-        // so its checkbox renders unticked, ready to enable by hand.
-        if (this.config.enableChartLayers)
-          chart.layer.addTo(this.map);
+        chart.layer.addTo(this.map);
         this.layersControl.addOverlay(chart.layer, chart.name);
       } else {
         this.map.removeLayer(chart.layer);
@@ -885,6 +913,32 @@ class ChartPlotter {
     }
     // Programmatic add/remove doesn't fire overlayadd/overlayremove, so refresh
     // the attribution strip by hand when a chart's credit came or went.
+    if (changed)
+      this.updateAttribution();
+  }
+
+  // Live toggle for the local-charts feature (config.enableChartLayers). The
+  // first enable is what kicks off the catalog fetch when startup skipped it
+  // (feature off); afterwards enabling just re-lists the cached charts for
+  // the current view, and disabling pulls every listed chart off the map and
+  // out of the layer control.
+  setChartLayersEnabled(enabled) {
+    if (enabled) {
+      if (this.chartLoadStarted)
+        this.updateChartLayers();
+      else
+        this.addChartLayers();
+      return;
+    }
+    let changed = false;
+    for (const chart of this.chartLayers) {
+      if (!chart.listed)
+        continue;
+      this.map.removeLayer(chart.layer);
+      this.layersControl.removeLayer(chart.layer);
+      chart.listed = false;
+      changed = true;
+    }
     if (changed)
       this.updateAttribution();
   }

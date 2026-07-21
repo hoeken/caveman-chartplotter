@@ -244,6 +244,12 @@ export class FleetLayer {
       return;
     this.showOwnTrack = next;
     this.applyTrackVisibility();
+    // If startup skipped the heavy loads (toggles were off), the first enable
+    // triggers them now.
+    if (next && !this.tracksLoadStarted)
+      this.fetchAndLoadTracks();
+    if (next && !this.historySeedStarted)
+      this.seedOwnTrackFromHistory();
   }
 
   // Flip other-vessel track visibility live (from the settings dialog).
@@ -253,6 +259,8 @@ export class FleetLayer {
       return;
     this.showOtherTracks = next;
     this.applyTrackVisibility();
+    if (next && !this.tracksLoadStarted)
+      this.fetchAndLoadTracks();
   }
 
   // Apply a new course-vector length live (from the settings dialog). Redraw our
@@ -313,8 +321,13 @@ export class FleetLayer {
 
   // Fetch historical tracks for the current filter radius and draw them. Split
   // out of loadInitialData so setFilterRadius can re-run it on a radius change
-  // without re-arming the fleet timer.
+  // without re-arming the fleet timer. The /tracks read is heavy, so it's
+  // skipped entirely while both track toggles are off; the first toggle-on
+  // fetches it lazily (see setShowOwnTrack/setShowOtherTracks).
   fetchAndLoadTracks() {
+    if (!this.showOwnTrack && !this.showOtherTracks)
+      return;
+    this.tracksLoadStarted = true;
     this.app.signalK
       .fetchTracks(this.filterRadius)
       .then((tracks) => {
@@ -717,7 +730,12 @@ export class FleetLayer {
   // restarts — unlike the in-memory buffer the tracks plugin serves /tracks
   // from. Failures are silent and non-fatal: without a history provider the
   // endpoint 404s and whatever the /tracks load produced keeps being used.
+  // The history query is heavy, so it's skipped while the own-track toggle is
+  // off; the first toggle-on runs it lazily (see setShowOwnTrack).
   seedOwnTrackFromHistory() {
+    if (!this.showOwnTrack)
+      return;
+    this.historySeedStarted = true;
     const to = new Date();
     const from = new Date(to.getTime() - OWN_TRACK_HISTORY_HOURS * 60 * 60 * 1000);
     this.app.signalK
