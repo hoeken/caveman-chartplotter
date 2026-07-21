@@ -67,6 +67,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
+    "esbuild": "^0.28.1",
     "eslint": "^10.4.0",
     "globals": "^17.6.0",
     "husky": "^9.1.7",
@@ -74,6 +75,7 @@
     "png-to-ico": "^3.0.1",
     "prettier": "^3.8.3",
     "sharp": "^0.35.2",
-    "vite": "^8.0.13"
+    "vite": "^8.0.13",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }
