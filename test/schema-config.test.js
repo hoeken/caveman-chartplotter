@@ -3,36 +3,60 @@ import assert from "node:assert/strict";
 import {
   pickUiConfig,
   coerceUiConfig,
-  applyDefaults,
+  buildSchema,
+  defaultUiConfig,
+  uiSchemaProperties,
   UI_CONFIG_KEYS,
 } from "../src/schema.js";
 import { ValidationError } from "../src/errors.js";
 
 // buildSchema(app) only ever calls app.getSelfPath() to mark path checks, so a
-// stub that reports every path as absent is enough for coercion/defaults tests.
+// stub that reports every path as absent is enough for schema tests.
 const APP = { getSelfPath: () => null };
 
+describe("UI preference schema split", () => {
+  test("the whitelist is exactly the UI preference schema's keys", () => {
+    assert.deepEqual(UI_CONFIG_KEYS, Object.keys(uiSchemaProperties));
+  });
+
+  test("the plugin schema no longer carries the UI preference keys", () => {
+    const props = buildSchema(APP).properties;
+    for (const key of UI_CONFIG_KEYS)
+      assert.equal(key in props, false, `${key} should be out of the plugin schema`);
+    // ...leaving only the read-only path checks.
+    assert.deepEqual(Object.keys(props), ["pathChecks"]);
+  });
+
+  test("defaultUiConfig() yields a fresh copy of every default", () => {
+    const defaults = defaultUiConfig();
+    assert.equal(defaults.defaultBasemap, "Satellite");
+    assert.equal(defaults.fleetFilterRadius, 100000);
+    assert.equal(defaults.courseVectorMinutes, 15);
+    assert.equal(defaults.enableLookAhead, true);
+    assert.deepEqual(Object.keys(defaults), UI_CONFIG_KEYS);
+    defaults.defaultBasemap = "mutated";
+    assert.equal(defaultUiConfig().defaultBasemap, "Satellite");
+  });
+});
+
 describe("pickUiConfig()", () => {
-  test("projects exactly the whitelisted keys", () => {
+  test("projects only whitelisted keys that carry a value", () => {
     const picked = pickUiConfig({
       defaultBasemap: "Satellite",
       somethingInternal: "secret",
     });
-    assert.deepEqual(Object.keys(picked).sort(), [...UI_CONFIG_KEYS].sort());
-    assert.equal(picked.defaultBasemap, "Satellite");
-    assert.equal("somethingInternal" in picked, false);
+    assert.deepEqual(picked, { defaultBasemap: "Satellite" });
   });
 
-  test("fills undefined for keys absent from the source config", () => {
-    const picked = pickUiConfig({});
-    assert.equal(picked.defaultBasemap, undefined);
-    assert.equal("defaultBasemap" in picked, true);
+  test("omits keys absent from the source config", () => {
+    assert.deepEqual(pickUiConfig({}), {});
+    assert.deepEqual(pickUiConfig(), {});
   });
 });
 
 describe("coerceUiConfig()", () => {
   test("returns only the whitelisted keys that were present", () => {
-    const updates = coerceUiConfig(APP, {
+    const updates = coerceUiConfig({
       defaultBasemap: "OpenStreetMap",
       somethingInternal: "nope", // not a UI key — must be ignored
     });
@@ -40,7 +64,7 @@ describe("coerceUiConfig()", () => {
   });
 
   test("coerces integers (rounding) and booleans", () => {
-    const updates = coerceUiConfig(APP, {
+    const updates = coerceUiConfig({
       fleetFilterRadius: "512.7",
       enableBoatLabels: 0,
     });
@@ -50,14 +74,14 @@ describe("coerceUiConfig()", () => {
 
   test("throws ValidationError on an enum violation", () => {
     assert.throws(
-      () => coerceUiConfig(APP, { defaultBasemap: "CARRIER_PIGEON" }),
+      () => coerceUiConfig({ defaultBasemap: "CARRIER_PIGEON" }),
       ValidationError,
     );
   });
 
   test("throws ValidationError when a string field gets a non-string", () => {
     assert.throws(
-      () => coerceUiConfig(APP, { defaultBasemap: 42 }),
+      () => coerceUiConfig({ defaultBasemap: 42 }),
       ValidationError,
     );
   });
@@ -65,43 +89,19 @@ describe("coerceUiConfig()", () => {
   test("accepts the <select> string form of an integer enum value", () => {
     // The settings dialog posts courseVectorMinutes as a string ("15"); it must
     // coerce to the integer 15 and pass the enum check.
-    const updates = coerceUiConfig(APP, { courseVectorMinutes: "15" });
+    const updates = coerceUiConfig({ courseVectorMinutes: "15" });
     assert.equal(updates.courseVectorMinutes, 15);
   });
 
   test("accepts 0 (off) for the course vector", () => {
-    const updates = coerceUiConfig(APP, { courseVectorMinutes: "0" });
+    const updates = coerceUiConfig({ courseVectorMinutes: "0" });
     assert.equal(updates.courseVectorMinutes, 0);
   });
 
   test("throws ValidationError on an integer-enum violation", () => {
     assert.throws(
-      () => coerceUiConfig(APP, { courseVectorMinutes: 7 }),
+      () => coerceUiConfig({ courseVectorMinutes: 7 }),
       ValidationError,
     );
-  });
-});
-
-describe("applyDefaults()", () => {
-  test("fills schema defaults for unset keys", () => {
-    const config = {};
-    applyDefaults(APP, config);
-    assert.equal(config.defaultBasemap, "Satellite");
-    assert.equal(config.fleetFilterRadius, 100000);
-    assert.equal(config.enableBoatLabels, true);
-    assert.equal(config.enableOwnTrack, true);
-    assert.equal(config.enableOtherTracks, true);
-    assert.equal(config.enableRoutes, true);
-    assert.equal(config.enableChartLayers, true);
-    assert.equal(config.enableSeascape, false);
-    assert.equal(config.courseVectorMinutes, 15);
-    assert.equal(config.enableLookAhead, true);
-  });
-
-  test("never overwrites a value the user already set", () => {
-    const config = { defaultBasemap: "OpenStreetMap", fleetFilterRadius: 999 };
-    applyDefaults(APP, config);
-    assert.equal(config.defaultBasemap, "OpenStreetMap");
-    assert.equal(config.fleetFilterRadius, 999);
   });
 });

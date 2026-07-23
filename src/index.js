@@ -13,7 +13,8 @@
  * limitations under the License.
  */
 
-import { buildSchema, applyDefaults } from "./schema.js";
+import { buildSchema } from "./schema.js";
+import { UiConfigStore } from "./ui-config.js";
 import { register as registerHttpRoutes } from "./http-routes.js";
 
 export default function (app) {
@@ -24,9 +25,16 @@ export default function (app) {
   plugin.description = "A simple, lightweight chart plotter that runs anywhere — even on the older embedded browsers found in Navico MFDs.";
 
   plugin.configuration = undefined;
+  plugin.uiConfigStore = new UiConfigStore(app);
 
   plugin.start = function (props) {
-    plugin.configuration = applyDefaults(app, props || {});
+    plugin.configuration = props || {};
+    // v1.5 upgrade: UI preferences move out of the plugin config into
+    // per-identity storage; any legacy keys become the boat-wide baseline.
+    if (plugin.uiConfigStore.migrateFromPluginConfig(plugin.configuration)) {
+      app.debug("migrated legacy UI preferences to per-identity storage");
+      plugin.savePluginOptions();
+    }
     app.setPluginStatus("Started");
   };
 

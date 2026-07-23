@@ -20,33 +20,36 @@ describe("plugin identity", () => {
 });
 
 describe("plugin.start()", () => {
-  test("stores the supplied configuration and reports Started", () => {
+  test("reports Started", () => {
     const { h, plugin } = setup();
-    plugin.start({ defaultBasemap: "OpenStreetMap" });
-    assert.equal(plugin.configuration.defaultBasemap, "OpenStreetMap");
+    plugin.start({});
     assert.equal(h.lastStatus(), "Started");
   });
 
-  test("fills schema defaults for unset keys", () => {
-    const { plugin } = setup();
+  test("migrates legacy UI keys out of the plugin config and persists the upgrade", () => {
+    const { h, plugin } = setup();
+    plugin.start({ defaultBasemap: "OpenStreetMap" });
+    // The legacy key becomes the boat-wide baseline in the preference store…
+    assert.equal(
+      plugin.uiConfigStore.resolve(null).defaultBasemap,
+      "OpenStreetMap",
+    );
+    // …and is stripped from the saved plugin config.
+    assert.equal(plugin.configuration.defaultBasemap, undefined);
+    assert.equal(h.calls.savePluginOptions.length, 1);
+    h.cleanupDataDir();
+  });
+
+  test("does not persist when there is nothing to migrate", () => {
+    const { h, plugin } = setup();
     plugin.start({});
-    assert.equal(plugin.configuration.defaultBasemap, "Satellite");
-    assert.equal(plugin.configuration.fleetFilterRadius, 100000);
-    assert.equal(plugin.configuration.enableBoatLabels, true);
-    assert.equal(plugin.configuration.enableSeascape, false);
+    assert.equal(h.calls.savePluginOptions.length, 0);
   });
 
   test("tolerates being started with no props at all", () => {
     const { plugin } = setup();
     assert.doesNotThrow(() => plugin.start(undefined));
-    assert.equal(plugin.configuration.defaultBasemap, "Satellite");
-  });
-
-  test("never overwrites a value the user already set", () => {
-    const { plugin } = setup();
-    plugin.start({ fleetFilterRadius: 999, enableBoatLabels: false });
-    assert.equal(plugin.configuration.fleetFilterRadius, 999);
-    assert.equal(plugin.configuration.enableBoatLabels, false);
+    assert.deepEqual(plugin.configuration, {});
   });
 });
 
@@ -60,12 +63,12 @@ describe("plugin.stop()", () => {
 });
 
 describe("plugin.schema()", () => {
-  test("builds a schema exposing every UI config key", () => {
+  test("no longer exposes the per-user UI preference keys", () => {
     const { plugin } = setup();
     const schema = plugin.schema();
     assert.equal(schema.title, "Caveman Chartplotter");
     for (const key of UI_CONFIG_KEYS)
-      assert.ok(schema.properties[key], `schema is missing ${key}`);
+      assert.equal(key in schema.properties, false, `${key} should be out of the plugin schema`);
   });
 
   test("marks path checks present/absent from getSelfPath", () => {
@@ -98,10 +101,10 @@ describe("plugin.registerWithRouter()", () => {
 describe("plugin.savePluginOptions()", () => {
   test("saves the live configuration through the app", () => {
     const { h, plugin } = setup();
-    plugin.start({ defaultBasemap: "Blank" });
+    plugin.start({});
     plugin.savePluginOptions();
     assert.equal(h.calls.savePluginOptions.length, 1);
-    assert.equal(h.calls.savePluginOptions[0].defaultBasemap, "Blank");
+    assert.deepEqual(h.calls.savePluginOptions[0], {});
   });
 
   test("routes a save failure to app.error", () => {

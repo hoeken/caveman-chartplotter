@@ -42,7 +42,7 @@
       },
       "Config": {
         "type": "object",
-        "description": "UI-relevant plugin configuration. Properties are omitted when unset; the UI falls back to its own defaults.",
+        "description": "Per-user UI preferences. Stored per identity (username for user tokens, clientId for device tokens, a shared anonymous bucket otherwise); GET resolves defaults, then the boat-wide baseline migrated from pre-1.5 plugin config, then the identity's own saved keys.",
         "properties": {
           "defaultBasemap": {
             "type": "string",
@@ -87,10 +87,24 @@
             "enum": [0, 5, 10, 15, 30, 60],
             "description": "Length, in minutes of travel, of the COG/SOG course vector (predictor line) drawn from each vessel's bow. 0 disables it."
           },
+          "enableLookAhead": {
+            "type": "boolean",
+            "description": "While following your boat, bias the view toward the water ahead based on speed and course instead of centering on the boat."
+          },
           "hasCustomIcon": {
             "type": "boolean",
             "readOnly": true,
             "description": "Derived (not stored): whether a custom own-boat icon has been uploaded via PUT /icon. The UI uses it to decide whether to render the custom icon and how to seed the settings preview."
+          },
+          "selfId": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Derived (not stored): the server's own vessel id, so the UI can pick its entry out of the bulk /vessels payload."
+          },
+          "version": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Derived (not stored): the plugin version, shown in the settings footer."
           }
         }
       },
@@ -149,11 +163,11 @@
     "/ui-config": {
       "get": {
         "tags": ["config"],
-        "summary": "Get UI-relevant plugin configuration",
-        "description": "Returns plugin configuration values that the web UI needs at startup. Unset properties are omitted; the UI applies its own defaults in that case.",
+        "summary": "Get the requesting identity's UI preferences",
+        "description": "Returns the effective UI preferences for the requesting identity (username for user tokens, device clientId for device tokens, a shared anonymous bucket otherwise): schema defaults, overlaid with the boat-wide baseline, overlaid with the identity's own saved keys. Every preference key is always present.",
         "responses": {
           "200": {
-            "description": "Plugin configuration returned successfully.",
+            "description": "Effective UI preferences returned successfully.",
             "content": {
               "application/json": {
                 "schema": {
@@ -169,8 +183,8 @@
       },
       "post": {
         "tags": ["config"],
-        "summary": "Update UI-relevant plugin configuration",
-        "description": "Persists UI-editable settings. Only whitelisted properties are accepted; each is validated, written onto the live plugin configuration, and saved. Requires authentication.",
+        "summary": "Update the requesting identity's UI preferences",
+        "description": "Persists UI-editable settings for the requesting identity. Only whitelisted properties are accepted; each is validated and merged into that identity's preference file — other identities are unaffected. Requires authentication.",
         "requestBody": {
           "required": true,
           "content": {
