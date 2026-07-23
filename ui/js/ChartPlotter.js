@@ -100,6 +100,7 @@ class ChartPlotter {
       enableRoutes: true,
       enableChartLayers: true,
       enableSeascape: false,
+      enableLargeControls: true,
       courseVectorMinutes: 15,
       enableLookAhead: true,
       hasCustomIcon: false,
@@ -486,6 +487,9 @@ class ChartPlotter {
         if (this.version)
           console.log(`Caveman Chartplotter v${this.version}`);
 
+        // Before buildMap so the controls are born at the configured size.
+        this.setLargeControls(this.config.enableLargeControls);
+
         const selfId = this.config.selfId ?? (await this.signalK.fetchSelfId());
         const vessels = await this.signalK.fetchAllVessels();
         this.statusBar.clear("initial-load");
@@ -650,6 +654,7 @@ class ChartPlotter {
     this.fleetLayer?.setShowOtherTracks(this.config.enableOtherTracks);
     this.fleetLayer?.setCourseVectorMinutes(this.config.courseVectorMinutes);
     this.routesLayer?.setShowRoutes(this.config.enableRoutes);
+    this.setLargeControls(this.config.enableLargeControls);
     this.updateMap();
     this.statusBar.clear("config-save");
     return this.signalK.saveConfig(newConfig).catch((error) => {
@@ -857,6 +862,13 @@ class ChartPlotter {
       layer.addTo(this.map);
     else if (!enabled && this.map.hasLayer(layer))
       this.map.removeLayer(layer);
+  }
+
+  // Match the map control sizing to config.enableLargeControls: the class on
+  // <html> (same pattern as the dark theme) selects the 1.5x control rules in
+  // style.css; without it the controls fall back to Leaflet's stock sizing.
+  setLargeControls(enabled) {
+    document.documentElement.classList.toggle("largeControls", Boolean(enabled));
   }
 
   // Local raster charts served by SignalK's resources API (see ChartLayers) are

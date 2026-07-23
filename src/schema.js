@@ -118,6 +118,13 @@ export function buildSchema(app) {
           "Overlay the Seascape bathymetry (water depth) chart on top of the base map by default. Needs an internet connection and a WebGL-capable browser; where either is missing the base map shows unchanged. Also toggleable at runtime in the layer control.",
         default: false,
       },
+      enableLargeControls: {
+        type: "boolean",
+        title: "Use Large UI Controls",
+        description:
+          "Draw the map control buttons (zoom, home, settings, theme, layers) at 1.5x size for easier touch targets. Turn off for the original smaller sizing.",
+        default: true,
+      },
       courseVectorMinutes: {
         type: "integer",
         title: "Course Vector Time (minutes)",
@@ -172,6 +179,7 @@ export const UI_CONFIG_KEYS = [
   "enableRoutes",
   "enableChartLayers",
   "enableSeascape",
+  "enableLargeControls",
   "courseVectorMinutes",
   "enableLookAhead",
 ];
