@@ -95,6 +95,7 @@ class ChartPlotter {
       fleetFilterRadius: 500,
       defaultBasemap: "Satellite",
       enableBoatLabels: true,
+      enableOwnBoatLabel: true,
       enableOwnTrack: true,
       enableOtherTracks: true,
       enableRoutes: true,
@@ -650,6 +651,7 @@ class ChartPlotter {
     this.setChartLayersEnabled(this.config.enableChartLayers);
     this.fleetLayer?.setFilterRadius(this.config.fleetFilterRadius);
     this.fleetLayer?.setShowLabels(this.config.enableBoatLabels);
+    this.fleetLayer?.setShowOwnLabel(this.config.enableOwnBoatLabel);
     this.fleetLayer?.setShowOwnTrack(this.config.enableOwnTrack);
     this.fleetLayer?.setShowOtherTracks(this.config.enableOtherTracks);
     this.fleetLayer?.setCourseVectorMinutes(this.config.courseVectorMinutes);
@@ -807,6 +809,7 @@ class ChartPlotter {
       ownMmsi: this.state.boatConfig.mmsi,
       filterRadius: this.config.fleetFilterRadius,
       showLabels: this.config.enableBoatLabels,
+      showOwnLabel: this.config.enableOwnBoatLabel,
       showOwnTrack: this.config.enableOwnTrack,
       showOtherTracks: this.config.enableOtherTracks,
       courseVectorMinutes: this.config.courseVectorMinutes,
