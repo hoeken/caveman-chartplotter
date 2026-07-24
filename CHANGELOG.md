@@ -1,3 +1,16 @@
+# v1.5.0
+
+Per-user settings and a round of touch/mobile polish (mostly ported from hoekens-anchor-alarm):
+
+- **UI settings are now saved per user** — preferences live in small per-identity files under the plugin's data directory (keyed by username for user logins, client ID for device tokens, with a shared bucket for anonymous sessions) instead of in the plugin config, so different logins keep their own settings and saving from the map no longer rewrites the server's plugin configuration. Each read layers schema defaults → boat-wide defaults → your own saved keys, and a one-shot migration at startup lifts preferences from pre-1.5 installs into the boat-wide defaults so existing choices survive the upgrade.
+- **Chart show/hide choices are remembered** — ticking a chart checkbox in the layer control now persists per user through the same store, and re-listing a chart after panning or zooming honors the saved choice — which also fixes an unchecked chart silently re-enabling itself when it scrolled back into view. Only SignalK-provided charts are tracked (base maps and the Seascape overlay are untouched), and logged-out sessions keep the toggle session-local.
+- **Your own boat gets a name label** — a new "Show Own Boat Name Label" setting (default on, independent of the other-vessel "Show Boat Name Labels" switch) draws your boat's name like the AIS fleet's. The own label always wins the label collision pass against AIS labels, all name labels now render uppercase for consistency, and the label halo is stronger for readability over busy charts.
+- **Large controls are now optional** — a new "Use Large UI Controls" setting toggles the 1.5× touch-friendly map-control sizing (default on, so nothing changes out of the box; off restores stock Leaflet sizing), applied live from the settings dialog. The home/gear/zoom glyphs also no longer draw over-thick strokes in large mode.
+- **Feedback while force-reloading** — when the page returns from a long background suspension or the back/forward cache and has to refresh, a full-page spinner overlay is shown instead of a frozen frame of stale data (built entirely inline and Chromium 69-safe for Navico MFDs).
+- **Fixes**
+  - Rotating an iPhone/iPad no longer letterboxes the page with white bars and offset touch targets — the web view now owns the entire window (`viewport-fit=cover` plus a translucent status bar), the map container is pinned to the viewport, and the attribution strip and map re-measure once the rotated layout actually settles so the bottom controls and the home button's recentering stay correct.
+  - Long-pressing a boat or toolbar icon on iOS no longer opens the save-image sheet and strands the touch gesture, with an equivalent context-menu guard for Android and MFD browsers that leaves real links alone.
+
 # v1.4.0
 
 A round of startup work aimed at lightweight hardware — a Raspberry Pi running the single-threaded Signal K server — where the webapp's request fan-out at load contended with itself and bogged everything down (ported from hoekens-anchor-alarm v2.10.2):
