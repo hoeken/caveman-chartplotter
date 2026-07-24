@@ -790,6 +790,28 @@ class ChartPlotter {
     // the next update tick.
     this.map.on("zoomend", () => this.followTick());
     window.addEventListener("resize", () => this.updateAttribution());
+    // The resize listener measures at event time, which iOS fires while the
+    // rotated layout is still settling: the attribution strip hasn't re-wrapped
+    // yet (so --attributionHeight goes stale and bottom controls sit wrong) and
+    // Leaflet's own trackResize caches the mid-rotation map size (so
+    // fitBounds/home centers on the previous viewport's midpoint).
+    // ResizeObserver callbacks run after layout settles, with final geometry,
+    // so re-measure there; observing the elements also covers resizes that
+    // never fire a window event. Chromium 64+ / iOS 13.1+; older engines keep
+    // the listeners above. debounceMoveend matches trackResize so a continuous
+    // desktop resize doesn't run updateChartLayers every frame.
+    if (window.ResizeObserver) {
+      this._attributionObserver = new ResizeObserver(() =>
+        this.updateAttribution(),
+      );
+      this._attributionObserver.observe(
+        document.getElementById("mapAttribution"),
+      );
+      this._mapSizeObserver = new ResizeObserver(() =>
+        this.map.invalidateSize({ debounceMoveend: true }),
+      );
+      this._mapSizeObserver.observe(this.map.getContainer());
+    }
 
     // Read-only display of the routes served by a resources provider plugin
     // (see RoutesLayer). It owns its own fetch/poll cycle and moveend-driven
