@@ -143,6 +143,14 @@ export const uiSchemaProperties = {
       "While following your boat (the home button), bias the view toward the water ahead based on your speed and course, instead of centering exactly on the boat.",
     default: true,
   },
+  charts: {
+    type: "object",
+    title: "Chart Overlay Visibility",
+    description:
+      "Per-chart show/hide choices for SignalK-provided chart overlays, keyed by chart identifier. Saved as the user ticks chart checkboxes in the map's layer control (via POST /ui-config/charts), not from the settings dialog. A chart with no entry defaults to enabled. Base maps and the Seascape overlay are not tracked here.",
+    default: {},
+    additionalProperties: { type: "boolean" },
+  },
 };
 
 export function buildSchema(app) {
@@ -180,11 +188,15 @@ export function buildSchema(app) {
 export const UI_CONFIG_KEYS = Object.keys(uiSchemaProperties);
 
 // Fresh copy of the per-user preference defaults (the base layer every
-// /ui-config resolution starts from).
+// /ui-config resolution starts from). Object defaults (the charts map) are
+// cloned so mutating a resolved config can't poison the schema fragment.
 export function defaultUiConfig() {
   const out = {};
-  for (const [key, prop] of Object.entries(uiSchemaProperties))
-    out[key] = prop.default;
+  for (const [key, prop] of Object.entries(uiSchemaProperties)) {
+    out[key] = typeof prop.default === "object" && prop.default !== null
+      ? structuredClone(prop.default)
+      : prop.default;
+  }
   return out;
 }
 
@@ -229,6 +241,18 @@ function coerceToSchema(key, prop, value) {
     case "boolean":
       coerced = Boolean(value);
       break;
+    case "object": {
+      // Only boolean maps are supported (the charts visibility map):
+      // arbitrary string keys, every value coerced to a boolean.
+      if (prop.additionalProperties?.type !== "boolean")
+        throw new ValidationError(`unsupported schema type for ${key}`);
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        throw new ValidationError(`${key} must be an object`);
+      coerced = {};
+      for (const [k, v] of Object.entries(value))
+        coerced[k] = Boolean(v);
+      break;
+    }
     default:
       throw new ValidationError(`unsupported schema type for ${key}`);
   }

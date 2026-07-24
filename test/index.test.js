@@ -92,7 +92,7 @@ describe("plugin.registerWithRouter()", () => {
     };
     plugin.registerWithRouter(router);
     assert.deepEqual(registered.get.sort(), ["/icon", "/ui-config"]);
-    assert.deepEqual(registered.post, ["/ui-config"]);
+    assert.deepEqual(registered.post.sort(), ["/ui-config", "/ui-config/charts"]);
     assert.deepEqual(registered.put, ["/icon"]);
     assert.deepEqual(registered.delete, ["/icon"]);
   });
