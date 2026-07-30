@@ -740,8 +740,9 @@ class ChartPlotter {
       this.map.addControl(this.configPanel);
     }
 
-    // LayersControl (not the stock L.control.layers) so the route overlays
-    // stay grouped below a divider, separate from the local charts.
+    // LayersControl (not the stock L.control.layers): adds the Base Layer/
+    // Charts/Routes section headers and keeps the route overlays grouped
+    // under their own header, separate from the local charts.
     this.layersControl = new LayersControl(
       this.baseMaps,
       {},
