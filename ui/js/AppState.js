@@ -51,6 +51,26 @@ export class AppState {
             policy: "fixed",
             sendMeta: "all",
           },
+          {
+            // v2 Course API: the point currently being steered to — set both
+            // while following a route and while navigating to a lone waypoint.
+            // Drives the bow → next-point leg (FleetLayer.updateNextPointLine).
+            path: "navigation.course.nextPoint",
+            period: DELTA_FAST_SPEED,
+            format: "full",
+            policy: "fixed",
+            sendMeta: "all",
+          },
+          {
+            // Loaded only to gate the next-point leg: B&G plotters don't clear
+            // nextPoint when a route is stopped, but they do clear
+            // previousPoint — so the leg is drawn only while this is non-null.
+            path: "navigation.course.previousPoint",
+            period: DELTA_FAST_SPEED,
+            format: "full",
+            policy: "fixed",
+            sendMeta: "all",
+          },
         ],
       },
     );
@@ -135,12 +155,25 @@ export class AppState {
     // with SOG below, drives our own course vector (see FleetLayer).
     this.cog = this.extract(data, "navigation.courseOverGroundTrue", this.cog);
     this.sog = this.extract(data, "navigation.speedOverGround", this.sog);
-    // Not freshness-checked: a route activated hours ago is still the active
-    // route — its validity isn't time-based like a sensor reading's.
+    // Neither course path is freshness-checked: a course set hours ago is
+    // still the course — its validity isn't time-based like a sensor
+    // reading's.
     this.activeRoute = this.extract(
       data,
       "navigation.course.activeRoute",
       this.activeRoute,
+      false,
+    );
+    this.nextPoint = this.extract(
+      data,
+      "navigation.course.nextPoint",
+      this.nextPoint,
+      false,
+    );
+    this.previousPoint = this.extract(
+      data,
+      "navigation.course.previousPoint",
+      this.previousPoint,
       false,
     );
   }
@@ -172,6 +205,10 @@ export class AppState {
       this.sog = apply(this.sog);
     else if (path == "navigation.course.activeRoute")
       this.activeRoute = apply(this.activeRoute);
+    else if (path == "navigation.course.nextPoint")
+      this.nextPoint = apply(this.nextPoint);
+    else if (path == "navigation.course.previousPoint")
+      this.previousPoint = apply(this.previousPoint);
     // else if (!path.startsWith("notifications"))
     //   console.log(`[websocket] Ignoring: ${path}`);
   }

@@ -26,6 +26,14 @@ import { SignalKHelper } from "../SignalKHelper.js";
 import { BoatConfig } from "../BoatConfig.js";
 import { DisplayUnit } from "../DisplayUnit.js";
 import { courseVectorLatLngs } from "../CourseVector.js";
+import {
+  NEXT_POINT_PANE,
+  NEXT_POINT_PANE_Z_INDEX,
+  NEXT_POINT_MARKER_PANE,
+  NEXT_POINT_MARKER_PANE_Z_INDEX,
+  nextPointLatLngs,
+  buildNextPointLine,
+} from "../NextPointLine.js";
 
 // How often to prune silent vessels and re-render the delta-fed cache.
 // Decoupled from the delta arrival rate so a busy anchorage doesn't trigger a
@@ -137,6 +145,7 @@ export class FleetLayer {
     this.ownVessel = undefined;
     this.ownAntenna = undefined;
     this.ownVector = undefined; // our own boat's course vector, or undefined
+    this.nextPointLine = undefined; // bow → navigation.course.nextPoint leg, or undefined
     this.ownBoatConfig = undefined;
     this.fleetTimer = null;
     // Course-vector length in minutes of travel; 0 (or a falsy setting) is off.
@@ -150,6 +159,14 @@ export class FleetLayer {
     this.filterRadius = filterRadius ?? DEFAULT_FILTER_RADIUS;
     this.selectedMmsi = null; // mmsi of the vessel whose popup is open, or null
     this.hoveredMmsi = null; // mmsi of the vessel/track under the cursor, or null
+
+    // Dedicated panes for the next-point leg: above the route panes, below
+    // the overlay pane and the vessel markers (see NextPointLine.js).
+    if (!map.getPane(NEXT_POINT_PANE))
+      map.createPane(NEXT_POINT_PANE).style.zIndex = NEXT_POINT_PANE_Z_INDEX;
+    if (!map.getPane(NEXT_POINT_MARKER_PANE))
+      map.createPane(NEXT_POINT_MARKER_PANE).style.zIndex =
+        NEXT_POINT_MARKER_PANE_Z_INDEX;
 
     this.setOwnVessel(this.app.state.getPosition(), this.app.state.boatConfig);
 
@@ -173,10 +190,13 @@ export class FleetLayer {
     this.map.on("moveend", () => this.updateLabelCollisions());
     this.updateLabelVisibility();
 
-    // Course vectors start at each boat's drawn bow, which shifts on zoom
-    // because the icon is size-clamped when zoomed out — so re-anchor them after
-    // every zoom, not just on the next data tick.
-    this.map.on("zoomend", () => this.refreshCourseVectors());
+    // Course vectors and the next-point leg start at a boat's drawn bow, which
+    // shifts on zoom because the icon is size-clamped when zoomed out — so
+    // re-anchor them after every zoom, not just on the next data tick.
+    this.map.on("zoomend", () => {
+      this.refreshCourseVectors();
+      this.updateNextPointLine();
+    });
 
     this.loadInitialData();
   }
@@ -613,6 +633,7 @@ export class FleetLayer {
     const pos = state.getPosition();
     this.addPointToTrack(this.ownMmsi, pos.lat, pos.lng);
     this.updateOwnVector();
+    this.updateNextPointLine();
   }
 
   // Own boat is kept outside the AIS vessels dict so syncOtherVessels never
@@ -710,6 +731,35 @@ export class FleetLayer {
       state.cog?.value,
       state.sog?.value,
     );
+  }
+
+  // Draw/update/remove the purple bow → navigation.course.nextPoint leg. Like
+  // the course vector it starts at the drawn bow, so it's recomputed every
+  // update tick and re-anchored on zoom; unlike it, the far end is a fixed
+  // position, and the whole leg vanishes the moment the course is cleared —
+  // nextPoint going null, or previousPoint going null on B&G plotters, which
+  // clear only the latter when a route is stopped (see nextPointLatLngs).
+  updateNextPointLine() {
+    if (!this.ownVessel)
+      return;
+    const latlngs = nextPointLatLngs(
+      this.ownVessel.getBoatBow() ?? this.ownVessel.getLatLng(),
+      this.app.state.nextPoint?.value,
+      this.app.state.previousPoint?.value,
+    );
+    if (!latlngs) {
+      if (this.nextPointLine) {
+        this.map.removeLayer(this.nextPointLine);
+        this.nextPointLine = undefined;
+      }
+      return;
+    }
+    if (this.nextPointLine) {
+      this.nextPointLine._line.setLatLngs(latlngs);
+      this.nextPointLine._marker.setLatLng(latlngs[1]);
+      return;
+    }
+    this.nextPointLine = buildNextPointLine(latlngs).addTo(this.map);
   }
 
   // Recompute one AIS vessel's course vector, keyed by mmsi alongside its marker

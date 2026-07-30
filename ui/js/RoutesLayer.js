@@ -25,15 +25,19 @@ import { bearing, point } from "@turf/turf";
 // beneath them. The waypoint shapes get their own pane one step above the line
 // so the dot/triangles/square always sit on top of the route line, never
 // buried under it; both panes stay below the overlay pane so the whole route
-// layer remains under the track and course vector.
+// layer remains under the track and course vector. The next-point leg
+// (NextPointLine.js, 390/395) slots between the route panes and the overlay
+// pane.
 export const ROUTE_PANE = "routePane";
 export const ROUTE_PANE_Z_INDEX = 375;
 export const ROUTE_MARKER_PANE = "routeMarkerPane";
 export const ROUTE_MARKER_PANE_Z_INDEX = 385;
 
 // Per the spec: solid green line, solid green shapes with a 1px white border.
+// The weight is exported so the next-point leg (NextPointLine.js) matches the
+// route lines' thickness.
 const ROUTE_COLOR = "#8b2222";
-const ROUTE_LINE_WEIGHT = 3;
+export const ROUTE_LINE_WEIGHT = 3;
 
 // How often to re-poll the routes collection. It's a small JSON document, so a
 // slow poll keeps externally-edited routes current at negligible cost.
@@ -188,19 +192,26 @@ function shapeIcon(size, body) {
   });
 }
 
-const SHAPE_STYLE = `fill="${ROUTE_COLOR}" stroke="#fff" stroke-width="1"`;
+const shapeStyle = (color) => `fill="${color}" stroke="#fff" stroke-width="1"`;
+
+// The route-end square in an arbitrary fill colour. Exported so the next-point
+// leg (NextPointLine.js) ends in the same square a route does, in its own
+// colour.
+export function squareIcon(color) {
+  return shapeIcon(12, `<rect x="1.5" y="1.5" width="9" height="9" ${shapeStyle(color)}/>`);
+}
 
 function iconFor(shape) {
   switch (shape.type) {
     case "dot":
-      return shapeIcon(12, `<circle cx="6" cy="6" r="4.5" ${SHAPE_STYLE}/>`);
+      return shapeIcon(12, `<circle cx="6" cy="6" r="4.5" ${shapeStyle(ROUTE_COLOR)}/>`);
     case "square":
-      return shapeIcon(12, `<rect x="1.5" y="1.5" width="9" height="9" ${SHAPE_STYLE}/>`);
+      return squareIcon(ROUTE_COLOR);
     default:
       // Points north (up) at angle 0; rotated clockwise by the leg's bearing.
       return shapeIcon(
         14,
-        `<path d="M7 1.5 L12.5 12.5 L1.5 12.5 Z" transform="rotate(${shape.angle.toFixed(1)} 7 7)" ${SHAPE_STYLE}/>`,
+        `<path d="M7 1.5 L12.5 12.5 L1.5 12.5 Z" transform="rotate(${shape.angle.toFixed(1)} 7 7)" ${shapeStyle(ROUTE_COLOR)}/>`,
       );
   }
 }
