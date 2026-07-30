@@ -1,3 +1,8 @@
+# v1.6.0
+
+- **The active leg is drawn on the chart** — while navigating, a purple line runs from your drawn bow to the point currently being steered to (`navigation.course.nextPoint`), route leg or lone waypoint alike, ending in a purple square at the destination. It draws in dedicated panes above the route layers but below tracks, course vectors, and vessel markers, and the destination is wrapped to the bow's world copy so an antimeridian-crossing leg stays short. Display is gated on `navigation.course.previousPoint` being set rather than `nextPoint` alone — B&G plotters don't clear `nextPoint` when a route is stopped, but they do clear `previousPoint`, making it the reliable "actually navigating" signal.
+- **Layer control sections are labeled** — the horizontal separator lines in the expanded layer control are replaced with bold **Base Layer**, **Charts + Overlays**, and **Routes** section headers, each followed by a rule filling the rest of the row. The Routes header only appears when routes are in view, same as the old divider.
+
 # v1.5.0
 
 Per-user settings and a round of touch/mobile polish (mostly ported from hoekens-anchor-alarm):
