@@ -157,23 +157,11 @@ export class SignalKHelper {
     return response.json();
   }
 
-  // The server's identity for our own vessel (e.g.
-  // "vessels.urn:mrn:imo:mmsi:123456789"), used to pick our entry out of the
-  // bulk /vessels payload. Normally that identity arrives on ui-config
-  // (selfId); this tiny public endpoint is the fallback for anonymous
-  // sessions, which can't read ui-config.
-  fetchSelfId() {
-    return this.request("self");
-  }
-  fetchAllVessels() {
-    return this.request("vessels");
-  }
-  // Fetch a single vessel's tree by its stream context (e.g.
-  // "vessels.urn:mrn:imo:mmsi:123456789"). Used for a one-shot static snapshot
-  // of a newly-sighted AIS target without re-pulling the whole /vessels tree.
-  fetchVessel(context) {
-    const id = String(context).replace(/^vessels\./, "");
-    return this.request(`vessels/${id}`);
+  // Our own vessel's tree, the one-shot seed for AppState at startup. Every
+  // other vessel arrives over the vessels.* delta subscription instead, so the
+  // (potentially large) bulk /vessels tree is no longer worth transferring.
+  fetchSelfVessel() {
+    return this.request("vessels/self");
   }
   fetchTracks(radius) {
     return this._enqueueHeavy(() => this.request(`tracks?radius=${radius}`));

@@ -145,16 +145,6 @@ class ChartPlotter {
     // delta to either own-boat state or the fleet layer once we subscribe to
     // both vessels.self and vessels.*.
     this.selfContext = null;
-    // Bumped on every websocket (re)connect so a fleet seed still in flight
-    // when its socket died can't subscribe on the next connection's behalf.
-    this._connectSeq = 0;
-    // Resolved once the initial-load /vessels snapshot has seeded the fleet
-    // cache. The websocket opens in parallel with that fetch, so the first
-    // connection gates its vessels.* subscription on this instead of the
-    // socket-after-seed ordering the old serial startup guaranteed.
-    this._initialSeed = new Promise((resolve) => {
-      this._resolveInitialSeed = resolve;
-    });
     // Smoothed course used for the look-ahead bias (radians true), advanced once
     // per update tick from the raw COG/heading. Null until the first reading; a
     // low-pass filter (see advanceLookAheadBearing) keeps the map from lurching
@@ -182,31 +172,14 @@ class ChartPlotter {
     this.client.on("delta", (delta) => this.handleDeltas(delta));
     this.client.on("connect", () => {
       this.state.websocketSubscribe(this.client);
-      // The server drops every subscription when the socket closes, so replay
-      // the per-vessel context subscriptions to keep static identity streaming
-      // after a reconnect. Before the seed below so the fresh subscriptions it
-      // sends for newly-seeded vessels aren't immediately re-sent.
-      this.fleetLayer?.resubscribeVessels();
-      // Gate the vessels.* subscription on a fresh fleet seed: deltas from
-      // vessels the cache doesn't hold each fire a per-vessel static fetch,
-      // so an unseeded cache means one redundant request per boat in sight.
-      // The first connection (and any reconnect while the initial load is
-      // still in flight — fleetLayer doesn't exist until it finishes) waits
-      // for the initial-load snapshot to seed the cache; later reconnects
-      // re-fetch /vessels because the prune timer keeps evicting while the
-      // socket is down. The seed settles even on failure, so a bad snapshot
-      // delays fleet updates, never blocks them; the seq guard keeps a seed
-      // whose socket died mid-fetch from subscribing early on the next
-      // connection's fresh seed.
-      const seq = ++this._connectSeq;
-      const seeded =
-        seq === 1 || !this.fleetLayer
-          ? this._initialSeed
-          : this.fleetLayer.seedFleet();
-      seeded.then(() => {
-        if (seq === this._connectSeq)
-          this.state.websocketSubscribeFleet(this.client);
-      });
+      // The server replays every matching cached value the moment we
+      // subscribe (its bootstrap snapshot), and handleDeltas drops fleet
+      // deltas until the FleetLayer exists — so the vessels.* subscription
+      // waits for it. First connection: loadInitialData subscribes right
+      // after buildMap. Reconnects: the layer is already there, subscribe
+      // now and the replay repopulates the map in one burst.
+      if (this.fleetLayer)
+        this.state.websocketSubscribeFleet(this.client);
     });
     this.client.connect();
   }
@@ -313,12 +286,12 @@ class ChartPlotter {
     if (this.embedded)
       this.toolbar.hide();
 
-    // Open the websocket now, in parallel with the REST startup chain, so
-    // live self data (position, heading, COG/SOG) isn't gated behind the bulk
-    // /vessels fetch. The connect handler subscribes vessels.self right away;
-    // deltas accumulate in AppState until the initial load builds the map and
-    // starts the render timer. The vessels.* fleet subscription still waits
-    // for the /vessels seed (see setupWebsockets).
+    // Open the websocket now, in parallel with the REST startup chain, so live
+    // self data (position, heading, COG/SOG) isn't gated behind the config and
+    // /vessels/self fetches. The connect handler subscribes vessels.self right
+    // away; deltas accumulate in AppState until the initial load builds the map
+    // and starts the render timer. The vessels.* fleet subscription waits for
+    // the FleetLayer to exist (see setupWebsockets).
     this.setupWebsockets();
 
     this.loadInitialData();
@@ -476,16 +449,14 @@ class ChartPlotter {
     return this.map.unproject(boatPoint.add(L.point(offset.x, offset.y)), zoom);
   }
 
-  // === Initial load (one /vessels call, broken into phases) ========================
+  // === Initial load (one /vessels/self call, broken into phases) ==================
 
   loadInitialData() {
-    // Config first: it carries selfId, which tells us which entry in the bulk
-    // /vessels payload is our own. /vessels is a superset of /vessels/self, so
-    // that one fetch covers both our own tree and the fleet's — fetching
-    // /vessels/self separately would transfer the (potentially large) own tree
-    // twice. Anonymous sessions can't read ui-config (loadConfig fell back to
-    // the defaults, which carry no selfId), so they learn the identity from
-    // the tiny public /self endpoint instead.
+    // Config first: the display preferences it carries have to be in place
+    // before the state extraction and buildMap below. Our own vessel tree then
+    // comes from /vessels/self — every other vessel is streamed over the
+    // vessels.* subscription, so there's nothing left in the bulk /vessels
+    // tree that we need.
     this.loadConfig()
       .then(async () => {
         console.log("UI Config:", this.config);
@@ -499,13 +470,10 @@ class ChartPlotter {
         // Before buildMap so the controls are born at the configured size.
         this.setLargeControls(this.config.enableLargeControls);
 
-        const selfId = this.config.selfId ?? (await this.signalK.fetchSelfId());
-        const vessels = await this.signalK.fetchAllVessels();
+        const vessel = await this.signalK.fetchSelfVessel();
         this.statusBar.clear("initial-load");
 
-        const selfKey = String(selfId ?? "").replace(/^vessels\./, "");
-        this.selfContext = this.normalizeContext(selfKey);
-        this.state.extractAll(vessels[selfKey] ?? {});
+        this.state.extractAll(vessel ?? {});
         this.state.calculate();
         console.log("App State:", this.state);
 
@@ -515,18 +483,17 @@ class ChartPlotter {
           return;
         }
 
-        // Everything below runs only once /vessels has resolved: buildMap
+        // Everything below runs only once /vessels/self has resolved: buildMap
         // constructs the FleetLayer (whose constructor starts the heavy
         // /tracks fetch) — deliberately kept off the critical path of the
-        // bulk load. The websocket has been open since init(); seeding the
-        // fleet cache from the snapshot we already hold and resolving
-        // _initialSeed releases its vessels.* subscription (see
-        // setupWebsockets). Vessel subscriptions the seed sends before the
-        // socket finishes opening are replayed by the connect handler's
-        // resubscribeVessels.
+        // initial load.
         this.buildMap();
-        this.fleetLayer.seedFleet(vessels);
-        this._resolveInitialSeed();
+        // With the FleetLayer now able to receive them, subscribe vessels.*:
+        // the server's bootstrap snapshot replays the whole known fleet
+        // (positions + static identity) in one delta burst at subscribe time.
+        // If the socket isn't open yet this frame is dropped and the connect
+        // handler sends it instead (fleetLayer exists from here on).
+        this.state.websocketSubscribeFleet(this.client);
         this.startUpdateTimer();
 
         this.advanceLookAheadBearing();

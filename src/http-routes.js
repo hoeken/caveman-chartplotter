@@ -171,15 +171,11 @@ export function register(app, plugin, router) {
     // clientId / anonymous — see UiConfigStore). The rest are read-only
     // ride-alongs, not stored preference keys; coerceUiConfig ignores unknown
     // keys, so a client echoing them back on POST is harmless.
-    // - selfId (e.g. "urn:mrn:imo:mmsi:123456789") lets the UI pick its own
-    //   entry out of the bulk /vessels payload instead of fetching the
-    //   (potentially large) /vessels/self tree separately.
     // - version saves a /plugins/<id> round trip for the settings footer.
     const store = plugin.uiConfigStore;
     res.json({
       ...store.resolve(store.identityFor(req)),
       hasCustomIcon: iconPath(app) !== null,
-      selfId: app.selfId,
       version: packageJson.version,
     });
   });
