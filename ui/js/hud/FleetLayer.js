@@ -26,6 +26,7 @@ import { SignalKHelper } from "../SignalKHelper.js";
 import { BoatConfig } from "../BoatConfig.js";
 import { DisplayUnit } from "../DisplayUnit.js";
 import { courseVectorLatLngs } from "../CourseVector.js";
+import { setFieldText } from "./missingField.js";
 import {
   NEXT_POINT_PANE,
   NEXT_POINT_PANE_Z_INDEX,
@@ -1028,7 +1029,7 @@ export class FleetLayer {
       loa: config.loa,
       gpsOffset: config.bowOffset,
     });
-    this.setVesselInfo(marker.vesselInfo, config, distance, bearing);
+    this.setVesselInfo(marker.vesselInfo, vessel, config, distance, bearing);
     if (marker.getTooltip()?.getContent() !== config.name)
       marker.setTooltipContent(config.name);
     marker.gpsAntennaMarker.setLatLng([position.latitude, position.longitude]);
@@ -1049,7 +1050,7 @@ export class FleetLayer {
     });
     marker.vesselMmsi = String(vessel.mmsi);
     marker._labelDistance = distance; // label-collision priority; see updateLabelCollisions
-    marker.vesselInfo = this.buildVesselInfo(config, distance, bearing);
+    marker.vesselInfo = this.buildVesselInfo(vessel, config, distance, bearing);
     marker.addTo(this.map).bindPopup(marker.vesselInfo);
 
     // Hovering the boat icon highlights its track, same style as selection.
@@ -1106,7 +1107,7 @@ export class FleetLayer {
   // Build the popup as a live DOM element. The element is kept on the marker
   // so later syncs can update each field in place via setVesselInfo instead of
   // replacing the whole popup body.
-  buildVesselInfo(config, distance, bearing) {
+  buildVesselInfo(vessel, config, distance, bearing) {
     const el = document.createElement("div");
     el.innerHTML = `
       <h4 class="vesselName"><span class="vesselNameText"></span><span class="mmsi"><span class="mmsiLabel">MMSI</span><a class="mmsiNum" target="_blank" rel="noopener"></a></span></h4>
@@ -1125,11 +1126,11 @@ export class FleetLayer {
         </tr>
       </table>
     `;
-    this.setVesselInfo(el, config, distance, bearing);
+    this.setVesselInfo(el, vessel, config, distance, bearing);
     return el;
   }
 
-  setVesselInfo(el, config, distance, bearing) {
+  setVesselInfo(el, vessel, config, distance, bearing) {
     const distanceUnit = distance > 1000 ? "distance" : "length";
     // Only rewrite a field when its value actually changed.
     const setText = (sel, value) => {
@@ -1137,18 +1138,40 @@ export class FleetLayer {
       if (node.textContent !== value)
         node.textContent = value;
     };
+    // Value fields go through setFieldText instead: a target that transmits no
+    // speed or course shows a dimmed "~" rather than an empty cell, and the
+    // envelopes a field is derived from dim it once they stop arriving, so a
+    // silent vessel's last-known numbers aren't presented as live.
+    const setField = (sel, value, envelopes = null) =>
+      setFieldText(el.querySelector(sel), value, envelopes);
+    const fix = SignalKHelper.extract(vessel, "navigation.position");
+
     setText(".vesselNameText", config.name);
     setText(".mmsiNum", String(config.mmsi));
     const mmsiLink = el.querySelector(".mmsiNum");
     const mmsiHref = `https://www.vesselfinder.com/?mmsi=${config.mmsi}`;
     if (mmsiLink.getAttribute("href") !== mmsiHref)
       mmsiLink.setAttribute("href", mmsiHref);
-    setText(".field-loa", DisplayUnit.formatValue(config.loa, "length"));
-    setText(".field-beam", DisplayUnit.formatValue(config.beam, "length"));
-    setText(".field-distance", DisplayUnit.formatValue(distance, distanceUnit));
-    setText(".field-bearing", `${bearing}°`);
-    setText(".field-sog", DisplayUnit.formatValue(config.sog, "speed"));
-    setText(".field-cog", DisplayUnit.formatValue(config.cog, "angle", 0));
+    // LOA/beam come from the (infrequent) AIS static report, so they're never
+    // dimmed — an hours-old hull length is still the hull length.
+    setField(".field-loa", DisplayUnit.formatValue(config.loa, "length"));
+    setField(".field-beam", DisplayUnit.formatValue(config.beam, "length"));
+    setField(
+      ".field-distance",
+      DisplayUnit.formatValue(distance, distanceUnit),
+      fix,
+    );
+    setField(".field-bearing", `${bearing}°`, fix);
+    setField(
+      ".field-sog",
+      DisplayUnit.formatValue(config.sog, "speed"),
+      SignalKHelper.extract(vessel, "navigation.speedOverGround"),
+    );
+    setField(
+      ".field-cog",
+      DisplayUnit.formatValue(config.cog, "angle", 0),
+      SignalKHelper.extract(vessel, "navigation.courseOverGroundTrue"),
+    );
   }
 
   // Bulk-load entry: pre-simplifies the input so a long history (e.g. a 24h

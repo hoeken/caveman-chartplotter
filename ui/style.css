@@ -917,6 +917,14 @@ table.vesselData td:nth-child(3) {
   padding-left: 12px;
 }
 
+/* Data-field values (see missingField.js): the missing-data placeholder and
+   stale last-known values share one muted treatment. Opacity rather than a
+   fixed gray so it reads as muted against both the light and dark surfaces. */
+.missing,
+.stale {
+  opacity: 0.5;
+}
+
 /* Boat name label above each vessel marker. Strip the default tooltip box and
    arrow, then use a white halo so the text stays legible over any map tile. */
 .boat-name-label.leaflet-tooltip {
