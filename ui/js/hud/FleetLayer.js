@@ -629,7 +629,10 @@ export class FleetLayer {
   }
 
   update(state) {
-    this.updateOwnPosition(state.getPosition(), state.boatConfig.heading);
+    // getHeading() rather than boatConfig.heading: the accessor falls back to
+    // COG when the compass feed goes stale, so the icon keeps pointing
+    // somewhere sensible instead of freezing at the last reported heading.
+    this.updateOwnPosition(state.getPosition(), state.getHeading());
     const pos = state.getPosition();
     this.addPointToTrack(this.ownMmsi, pos.lat, pos.lng);
     this.updateOwnVector();
@@ -986,11 +989,14 @@ export class FleetLayer {
     this.updateLabelCollisions();
   }
 
-  // Orientation preference for other vessels: COG > true heading > 0. AIS
-  // targets' reported heading is often stale, absent, or points off from actual
-  // travel (a Class B unit with no heading sensor may transmit a fixed/default
+  // Orientation preference for other vessels: COG > true heading > our own
+  // vessel's heading (via AppState.getHeading's fallback chain). AIS targets'
+  // reported heading is often stale, absent, or points off from actual travel
+  // (a Class B unit with no heading sensor may transmit a fixed/default
   // value), so course over ground — derived from successive fixes — is the more
-  // reliable indicator of which way a vessel is actually moving.
+  // reliable indicator of which way a vessel is actually moving. The last
+  // resort assumes neighbors lie to the wind/current like we do — a better
+  // guess than pointing them all north.
   deriveVesselHeading(vessel) {
     const cog = SignalKHelper.value(vessel, "navigation.courseOverGroundTrue");
     if (cog !== undefined)
@@ -1000,7 +1006,7 @@ export class FleetLayer {
     if (headingTrue !== undefined)
       return radiansToDegrees(headingTrue);
 
-    return 0;
+    return this.app.state.getHeading();
   }
 
   updateExistingVessel(vessel, position, heading, distance, bearing) {

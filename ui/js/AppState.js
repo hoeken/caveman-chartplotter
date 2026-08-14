@@ -106,6 +106,21 @@ export class AppState {
       return L.latLng(0, 0);
   }
 
+  // Own-vessel heading for display, in degrees — mirrors getPosition() as a
+  // read-time accessor with a safe fallback. Unlike computeOwnHeading, each
+  // source is gated on freshness so a dead compass feed can't freeze the boat
+  // icon at whatever it last reported:
+  // headingTrue > COG > 0
+  getHeading() {
+    if (SignalKHelper.isFresh(this.heading))
+      return radiansToDegrees(this.heading.value);
+
+    if (SignalKHelper.isFresh(this.cog))
+      return radiansToDegrees(this.cog.value);
+
+    return 0;
+  }
+
   // Pull one path's envelope out of a snapshot tree, merged against the
   // envelope we already hold. The websocket opens before the /vessels
   // snapshot resolves, so deltas may already carry a fresher value than the
