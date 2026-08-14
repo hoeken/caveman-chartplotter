@@ -51,7 +51,7 @@ http://[signalk-server-ip-address]:[port-number]/caveman-chartplotter/
 ```
 
 > [!NOTE]
-> You can view the app without logging in (read-only). The settings dialog appears once you log into your SignalK server — the login button lives at the top of the map and in the gear menu.
+> You can view the app without logging in (read-only). The settings dialog is open to everyone and every setting in it applies immediately, but without a read/write login your choices only last until you reload — the login button lives at the top of the map and in the gear menu. Uploading a custom boat icon is admin only. If your server has no security configured, everything is available to everyone.
 
 On a Navico MFD, install [signalk-navico-embedder](https://github.com/SignalK/signalk-navico-embedder) and the chartplotter shows up as a page on the console itself.
 

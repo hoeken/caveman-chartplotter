@@ -31,10 +31,13 @@ export class ControlToolbar {
       });
   }
 
-  // Anonymous users get the Login button; once logged in the toolbar has
-  // nothing to show.
+  // Sessions that can't store their preferences get the Login button; once
+  // logged in with write access the toolbar has nothing to show. A server with
+  // security disabled has no login to offer, and its sessions can write
+  // anyway, so the prompt stays hidden there too.
   update(appState) {
-    this._loginPrompt.style.display = appState.loggedIn ? "none" : "block";
+    const canWrite = appState.identity.canWrite();
+    this._loginPrompt.style.display = canWrite ? "none" : "block";
   }
 
   // Whole-toolbar visibility, driven by the embedded URL param (see

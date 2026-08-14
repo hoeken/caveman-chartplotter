@@ -2,6 +2,7 @@
 
 import { SignalKHelper } from "./SignalKHelper.js";
 import { BoatConfig } from "./BoatConfig.js";
+import { Identity } from "./Identity.js";
 import { radiansToDegrees } from "@turf/turf";
 
 const DEFAULT_FRESHNESS_SEC = 300;
@@ -9,6 +10,13 @@ const DEFAULT_FRESHNESS_SEC = 300;
 const DELTA_FAST_SPEED = 250;
 
 export class AppState {
+  constructor() {
+    // Who we are to the server and what we may do (see Identity). Replaced once
+    // the startup login-status probe resolves; until then the least-privileged
+    // identity, so no write control renders before we know it's permitted.
+    this.identity = Identity.anonymous();
+  }
+
   websocketSubscribe(client) {
     client.subscribe(
       {
