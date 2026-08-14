@@ -148,6 +148,20 @@ function readBodyBytes(req, limit) {
 export function register(app, plugin, router) {
   plugin.getOpenApi = () => openapi;
 
+  // Per-route access levels (signalk-server >= 2.31): routes registered
+  // through `router.access(level)` are reachable by readwrite/readonly users,
+  // anything registered on the router itself stays admin-only. Reading the
+  // display preferences and the boat icon is readonly; storing a user's own
+  // preferences is readwrite; replacing the boat icon changes how the boat
+  // looks for everyone aboard, so that stays admin. Older servers have no
+  // access() — the plugin refuses to start on them (see src/index.js), but
+  // this runs before that gate can, so fall back to the bare router.
+  const access = (level) =>
+    typeof router.access === "function" ? router.access(level) : router;
+  const readonly = access("readonly");
+  const readwrite = access("readwrite");
+  const admin = router;
+
   function fail(res, err) {
     if (err instanceof PluginError) {
       app.debug(err.message);
@@ -166,7 +180,7 @@ export function register(app, plugin, router) {
     }
   }
 
-  router.get("/ui-config", (req, res) => {
+  readonly.get("/ui-config", (req, res) => {
     // The preference set is resolved per identity (username / device
     // clientId / anonymous — see UiConfigStore). The rest are read-only
     // ride-alongs, not stored preference keys; coerceUiConfig ignores unknown
@@ -181,12 +195,12 @@ export function register(app, plugin, router) {
   });
 
   // ============================================================
-  // CUSTOM OWN-BOAT ICON  (GET public; PUT/DELETE are writes and rely on
-  // SignalK gating write methods on plugin routes — same assumption as the
-  // POST /ui-config route above.)
+  // CUSTOM OWN-BOAT ICON  (readable by any logged-in user; uploading or
+  // clearing it is admin-only — it changes how the boat looks for everyone
+  // aboard, so it stays with whoever configures the plugin.)
   // ============================================================
 
-  router.get("/icon", (req, res) => {
+  readonly.get("/icon", (req, res) => {
     try {
       const file = iconPath(app);
       if (!file) {
@@ -208,7 +222,7 @@ export function register(app, plugin, router) {
     }
   });
 
-  router.put("/icon", (req, res) => {
+  admin.put("/icon", (req, res) => {
     readBodyBytes(req, MAX_ICON_BYTES)
       .then((buf) => {
         if (!buf || buf.length === 0) {
@@ -251,7 +265,7 @@ export function register(app, plugin, router) {
       });
   });
 
-  router.delete("/icon", (req, res) => {
+  admin.delete("/icon", (req, res) => {
     try {
       removeIcon(app);
       res.json({ statusCode: 200, state: "COMPLETED" });
@@ -262,11 +276,11 @@ export function register(app, plugin, router) {
 
   // Persist UI-editable settings for the requesting identity. Only
   // whitelisted keys are accepted; each is coerced/validated against the UI
-  // preference schema and merged into that identity's store file. SignalK
-  // gates POSTs to plugin routes behind authentication, so reaching here
-  // implies the caller is logged in (or security is disabled entirely, in
-  // which case everyone shares the anonymous bucket).
-  router.post("/ui-config", (req, res) => {
+  // preference schema and merged into that identity's store file. The
+  // readwrite gate means reaching here implies the caller is logged in (or
+  // security is disabled entirely, in which case everyone shares the
+  // anonymous bucket).
+  readwrite.post("/ui-config", (req, res) => {
     try {
       const updates = coerceUiConfig(req.body || {});
 
@@ -285,8 +299,8 @@ export function register(app, plugin, router) {
   // route rather than a POST /ui-config body because the charts map is keyed
   // by dynamic chart identifiers: the client would have to echo the whole
   // map back (racing other tabs), while here it names just the one chart it
-  // toggled. Auth-gated by SignalK like every other plugin-route write.
-  router.post("/ui-config/charts", (req, res) => {
+  // toggled. Readwrite-gated like every other preference write.
+  readwrite.post("/ui-config/charts", (req, res) => {
     try {
       const { identifier, enabled } = req.body || {};
       if (typeof identifier !== "string" || identifier.length === 0)
