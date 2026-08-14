@@ -4,6 +4,9 @@ Satellite make map. Map show rocks. Rocks bad.
 
 A simple, lightweight chart plotter for [SignalK](https://signalk.org/).
 
+> [!IMPORTANT]
+> **Requires Signal K server v2.31 or newer.** Major performance upgrades and features in v2.31 are now required for this plugin to work. Plugin versions previous to 1.7.0 will continue to work on older versions of SK Server.
+
 The whole point is to run *anywhere*: it's built to work on the older embedded browsers found in Navico MFDs (B&G Vulcan/Zeus, Simrad, Lowrance — Chromium 69 era), and it stays light enough for phones, tablets, and cheap boat computers. No frameworks, no build-time magic in the way — just Leaflet, a websocket, and your boat.
 
 This is a hard fork of my anchor alarm plugin, [hoekens-anchor-alarm](https://github.com/hoeken/hoekens-anchor-alarm), with all the anchoring machinery stripped out and the chart plotting kept. If you want an anchor alarm, use that one — they run happily side by side.
@@ -40,7 +43,7 @@ A one-tap light/dark toggle, plus automatic handling of the `?mode=night` / `?mo
 
 ### ⚙️ In-map settings
 
-Logged-in users can tweak the UI without leaving for the plugin config page. A gear button opens a settings dialog (basemap, layer toggles, route display, fleet radius, boat icon, course vector length, follow-mode look ahead) and every change applies live.
+Anyone can tweak the UI without leaving for the plugin config page (a read/write login is only needed to make the choices stick). A gear button opens a settings dialog (basemap, layer toggles, route display, fleet radius, boat icon, course vector length, follow-mode look ahead) and every change applies live.
 
 ## Usage
 

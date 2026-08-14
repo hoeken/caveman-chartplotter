@@ -1,3 +1,19 @@
+# v1.7.0
+
+Ported from hoekens-anchor-alarm v2.11.0–v2.13.0.
+
+> [!IMPORTANT]
+> **Requires Signal K server v2.31 or newer.** The fleet feed and the API's permission levels below both depend on it; v1.6.0 remains the last release that runs on older servers. Startup now refuses to run on anything older, with a clear plugin error instead of a UI that half-works.
+
+- **Permissions come from the server, not from guesswork** — the UI used to infer its access level from whether `GET /ui-config` happened to succeed, which conflated "logged in" with "allowed to write": a read-only login got the full editing UI and every action it offered then 401'd. Startup now reads `/skServer/loginStatus` and resolves it to one of the server's own permission levels (none/readonly/readwrite/admin), including the awkward security-disabled case that reports "not logged in" while serving every route. Each API route declares the level it needs — reads are `readonly`, storing your preferences is `readwrite`, replacing the boat icon is `admin` — so crew with a plain read/write login keep their own display preferences without an admin account.
+- **The settings dialog is open to everyone** — the gear no longer bounces anonymous users to the login modal. Every setting applies live, so a read-only session can arrange the display for as long as the page lives; only the save is skipped, with a standing note in the dialog saying why. The footer link names the account you're using ("admin - Log out") and becomes a **Log in** link for sessions that can't save. The boat-icon uploader now only appears for admins, instead of being offered to any logged-in user and failing on upload.
+- **The fleet arrives over one subscription** — Signal K 2.31 resolves explicit paths under a wildcard context and replays cached values at subscribe time, so a single `vessels.*` subscription now delivers the whole known fleet — positions *and* static identity (name, ship type, dimensions) — in one burst and keeps it live. Gone with it: the per-vessel context subscriptions, the one-shot REST fetch per newly-sighted vessel, the bulk `/vessels` snapshot and all the seed-before-subscribe gating around it. Startup seeds own-boat state from `/vessels/self` instead.
+- **Smaller downloads** — the build now emits pre-compressed `.br` and `.gz` sidecars for every text asset over 1 kB, so a server that serves them sends 150 kB instead of 621 kB for the app and spends no CPU compressing it per request.
+- **Fixes**
+  - The boat icon no longer freezes at the last heading a dead compass reported: each heading source is now checked for freshness, falling back from `headingTrue` to COG. AIS targets with neither inherit our own displayed heading rather than all pointing north.
+  - Vessel popup fields that have nothing to show now render a dimmed `~` instead of an empty cell, and a field whose data has stopped arriving is dimmed rather than presented as live. Non-finite numbers render as missing instead of a literal "NaN m".
+  - iOS 26 home-screen web apps no longer show a grey bar below the attribution strip (iPhone) or a stray grey band under the footer (iPadOS windowed apps).
+
 # v1.6.0
 
 - **The active leg is drawn on the chart** — while navigating, a purple line runs from your drawn bow to the point currently being steered to (`navigation.course.nextPoint`), route leg or lone waypoint alike, ending in a purple square at the destination. It draws in dedicated panes above the route layers but below tracks, course vectors, and vessel markers, and the destination is wrapped to the bow's world copy so an antimeridian-crossing leg stays short. Display is gated on `navigation.course.previousPoint` being set rather than `nextPoint` alone — B&G plotters don't clear `nextPoint` when a route is stopped, but they do clear `previousPoint`, making it the reliable "actually navigating" signal.
