@@ -59,6 +59,7 @@
     "@signalk/tracks-plugin": "^2.0.2",
     "@turf/turf": "^7.3.5",
     "mathjs": "^15.2.0",
+    "semver": "^7.8.5",
     "simplify-js": "^1.2.4"
   },
   "repository": {

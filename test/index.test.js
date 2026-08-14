@@ -51,6 +51,45 @@ describe("plugin.start()", () => {
     assert.doesNotThrow(() => plugin.start(undefined));
     assert.deepEqual(plugin.configuration, {});
   });
+
+  test("refuses to start on a server older than the minimum", () => {
+    const h = createMockApp({ config: { version: "2.30.0" } });
+    const plugin = createPlugin(h.app);
+    plugin.start({});
+
+    assert.equal(plugin.started, false);
+    assert.equal(h.calls.pluginError.length, 1);
+    assert.match(
+      h.calls.pluginError[0],
+      /Requires signalk-server >=2\.31\.0-0, running 2\.30\.0/,
+    );
+    assert.equal(h.calls.errors.length, 1);
+    // Nothing else ran: no status, no config, no migration.
+    assert.equal(h.calls.status.length, 0);
+    assert.equal(plugin.configuration, undefined);
+  });
+
+  test("refuses to start when the server version is unreadable", () => {
+    const h = createMockApp({ config: {} });
+    const plugin = createPlugin(h.app);
+    plugin.start({});
+
+    assert.equal(plugin.started, false);
+    assert.equal(h.calls.pluginError.length, 1);
+    assert.equal(h.calls.status.length, 0);
+  });
+
+  test("starts on a supported server, including its prereleases", () => {
+    for (const version of ["2.31.0", "2.42.1", "2.31.0-beta.2", "2.32.0-beta.1"]) {
+      const h = createMockApp({ config: { version } });
+      const plugin = createPlugin(h.app);
+      plugin.start({});
+
+      assert.equal(plugin.started, true, version);
+      assert.equal(h.calls.pluginError.length, 0, version);
+      assert.equal(h.calls.status[0], "Started", version);
+    }
+  });
 });
 
 describe("plugin.stop()", () => {
@@ -59,6 +98,25 @@ describe("plugin.stop()", () => {
     plugin.start({});
     plugin.stop();
     assert.equal(h.lastStatus(), "Stopped");
+  });
+
+  test("leaves a refused start's error in place", () => {
+    const h = createMockApp({ config: { version: "2.30.0" } });
+    const plugin = createPlugin(h.app);
+    plugin.start({});
+    plugin.stop();
+
+    assert.equal(h.calls.status.length, 0);
+  });
+
+  test("is idempotent — a second stop is a no-op", () => {
+    const { h, plugin } = setup();
+    plugin.start({});
+    plugin.stop();
+    h.reset();
+    plugin.stop();
+
+    assert.equal(h.calls.status.length, 0);
   });
 });
 

@@ -13,9 +13,18 @@
  * limitations under the License.
  */
 
+import semver from "semver";
 import { buildSchema } from "./schema.js";
 import { UiConfigStore } from "./ui-config.js";
 import { register as registerHttpRoutes } from "./http-routes.js";
+
+// Oldest Signal K server this plugin supports. Older servers can't resolve
+// explicit paths under a wildcard context (so the fleet would render as
+// nameless, default-shaped hulls) and have no per-route access levels (so
+// every API route would be admin-only), and they'd fail in confusing ways
+// rather than obviously. The "-0" floor admits the 2.31.0 betas, which sort
+// below 2.31.0 and would otherwise be turned away.
+const MIN_SERVER_VERSION = ">=2.31.0-0";
 
 export default function (app) {
   const plugin = {};
@@ -28,6 +37,18 @@ export default function (app) {
   plugin.uiConfigStore = new UiConfigStore(app);
 
   plugin.start = function (props) {
+    // Bail out before touching anything else, so an unsupported server gets
+    // one clear error instead of a UI that half-works.
+    const serverVersion = app.config?.version;
+    if (!semver.satisfies(serverVersion, MIN_SERVER_VERSION, { includePrerelease: true })) {
+      plugin.started = false;
+      const message = `Requires signalk-server ${MIN_SERVER_VERSION}, running ${serverVersion}`;
+      app.error(message);
+      app.setPluginError(message);
+      return;
+    }
+
+    plugin.started = true;
     plugin.configuration = props || {};
     // v1.5 upgrade: UI preferences move out of the plugin config into
     // per-identity storage; any legacy keys become the boat-wide baseline.
@@ -39,7 +60,15 @@ export default function (app) {
   };
 
   plugin.stop = function () {
+    // A start refused on the server version touched nothing, so there is
+    // nothing to tear down — and overwriting its error with "Stopped" would
+    // hide why the plugin isn't running. Clearing `started` also makes a
+    // second stop a no-op.
+    if (!plugin.started)
+      return;
+
     app.setPluginStatus("Stopped");
+    plugin.started = false;
   };
 
   plugin.schema = function () {
