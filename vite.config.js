@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import { compression } from "vite-plugin-compression2";
 import { transformSync } from "esbuild";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -97,6 +98,27 @@ export default defineConfig({
   plugins: [
     viteSingleFile({ removeViteModuleLoader: true }),
     inlineVendorAndFixSourcemap(),
+    // Emit pre-compressed sidecars next to every text asset, so a server can
+    // send pre-compressed bytes instead of compressing on each request. That
+    // matters here: everything above collapses into one large index.html, and
+    // it is typically served by a Signal K server on a single-threaded
+    // Raspberry Pi, where on-the-fly compression competes with the actual
+    // boat data. Originals are kept, so anything that doesn't understand the
+    // sidecars keeps working unchanged.
+    compression({
+      // Both `.br` and `.gz`. Brotli is what every browser we target actually
+      // gets (Chromium 69 on Navico MFDs included), but not every serving
+      // layer looks for a `.br` — plenty only know the `.gz` convention
+      // (nginx's gzip_static, express-static-gzip's default). The `.gz` set is
+      // compressed once at build time, so carrying it costs nothing at runtime.
+      algorithms: ["brotliCompress", "gzip"],
+      // The default list, plus the sourcemaps (`.map`, the single largest
+      // output) and the PWA manifest.
+      include: /\.(html|xml|css|json|js|mjs|svg|map|webmanifest)$/,
+      // Under a kilobyte the extra request/encoding overhead outweighs the
+      // savings, and the sidecar is just clutter in the tarball.
+      threshold: 1024,
+    }),
   ],
   build: {
     outDir: "../public",
